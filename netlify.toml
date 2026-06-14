@@ -1,0 +1,12 @@
+# netlify.toml
+#
+# This site is a plain static folder (index.html + manifest.json + icons/ + sw.js
+# all sit at the project root, no build step). "publish" points at that root.
+# If you already deploy with a build step / different folder, change "publish"
+# to that folder and just keep the [functions] block.
+
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
