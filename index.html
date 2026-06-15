@@ -476,6 +476,10 @@ function RenZuReader() {
   const [aiStreaming, setAiStreaming] = useState(false);
   const [hovered, setHovered]       = useState(null);
   const [transitioning, setTransitioning] = useState(false);
+  const [voice, setVoice]           = useState("female");
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioError, setAudioError] = useState(false);
+  const audioElRef = useRef(null);
   const aiRef    = useRef(null);
   const customRef = useRef(null);
   const topRef   = useRef(null);
@@ -493,6 +497,40 @@ function RenZuReader() {
       setTransitioning(false);
     }, 300);
   }
+
+  // ── Audio narration helpers ──────────────────────────────────────
+  // Maps a chapter's display number (e.g. "10 & 11", "4 & 5") to the
+  // filename slug used for its narration files (e.g. "10-11", "4-5").
+  function audioSlug(num) {
+    return num.replace(/\s*&\s*/g, "-").replace(/\s+/g, "");
+  }
+  function audioSrc(c, v) {
+    return c ? `audio/ch${audioSlug(c.num)}-${v}.mp3` : "";
+  }
+  function toggleAudio() {
+    const el = audioElRef.current;
+    if (!el) return;
+    if (audioPlaying) { el.pause(); }
+    else { el.play().catch(() => setAudioError(true)); }
+  }
+  function switchVoice(v) {
+    if (v === voice) return;
+    const el = audioElRef.current;
+    const wasPlaying = audioPlaying;
+    const t = el ? el.currentTime : 0;
+    setAudioError(false);
+    setVoice(v);
+    setTimeout(() => {
+      if (!audioElRef.current) return;
+      audioElRef.current.currentTime = t;
+      if (wasPlaying) audioElRef.current.play().catch(() => setAudioError(true));
+    }, 50);
+  }
+  // Stop and reset narration whenever the open chapter changes.
+  useEffect(() => {
+    setAudioPlaying(false); setAudioError(false);
+    if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current.currentTime = 0; }
+  }, [selected]);
 
   function select(c) {
     setSelected(c); setAiResponse(""); setAiQuestion("");
@@ -569,7 +607,7 @@ function RenZuReader() {
       setAiResponse(data.reply);
     } catch (err) {
       setAiResponse(
-        "⚠ The AI Scholar is unavailable right now. " +
+        "⚠ Ren Zu is unavailable right now. " +
         (err && err.message ? err.message : "Please try again shortly.")
       );
     } finally {
@@ -605,6 +643,7 @@ function RenZuReader() {
   const textMid = D ? "#7a7872" : S ? "#5c3410" : "#5a5650";
   const textDim = D ? "#6b6860" : S ? "#a07840" : "#8a8680";
   const iconColor = D ? "#9a9890" : S ? "#7a4e18" : "#4a4642";
+  const glyphColor = D ? "#c8c6c0" : S ? "#4a2d08" : "#2e2a26";
   const ghostN  = D ? "rgba(255,255,255,0.045)" : S ? "rgba(80,42,8,0.09)"   : "rgba(0,0,0,0.048)";
 
   // Inputs
@@ -713,7 +752,7 @@ function RenZuReader() {
         .card-in:nth-child(7)  { animation-delay: 0.24s; }
         .card-in:nth-child(8)  { animation-delay: 0.28s; }
         .card-in:nth-child(n+9){ animation-delay: 0.32s; }
-        input::placeholder { color: ${iconColor}; font-family: ${headFont}; }
+        input::placeholder { color: ${textDim}; font-family: ${headFont}; }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -806,7 +845,10 @@ function RenZuReader() {
           {!selected && (
             <div style={{ marginTop: 14 }}>
               <div style={{ position: "relative", marginBottom: 10 }}>
-                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: iconColor, fontSize: 16, pointerEvents: "none" }}>⌕</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={glyphColor} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 1 }}>
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.2" y2="16.2" />
+                </svg>
                 <input value={query} onChange={e => setQuery(e.target.value)}
                   placeholder="Search across all 44 chapters…"
                   style={{ width: "100%", background: inputBg, border: `1px solid ${border}`, color: text, padding: "9px 36px 9px 36px", fontSize: 13, borderRadius: 14, outline: "none", fontFamily: headFont, backdropFilter: "blur(10px)", transition: "border-color 0.15s" }}
@@ -830,7 +872,11 @@ function RenZuReader() {
                 )}
               </div>
               <div style={{ marginTop: 6, position: "relative" }}>
-                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: iconColor, fontSize: 15, pointerEvents: "none", zIndex: 1 }}>≡</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={glyphColor} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 1 }}>
+                  <line x1="4" y1="6" x2="20" y2="6" />
+                  <line x1="4" y1="12" x2="20" y2="12" />
+                  <line x1="4" y1="18" x2="20" y2="18" />
+                </svg>
                 {/* ── Dropdown trigger ── */}
                 <button
                   onClick={() => setThemeOpen(o => !o)}
@@ -977,6 +1023,45 @@ function RenZuReader() {
                 </h2>
                 {/* Divider */}
                 <div style={{ marginTop: 20, height: 1, background: D ? `linear-gradient(90deg, ${accentLine} 0%, rgba(255,255,255,0.06) 50%, transparent 80%)` : `linear-gradient(90deg, ${accentLine} 0%, transparent 70%)` }} />
+
+                {/* ── Narration player ── */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+                  <button onClick={toggleAudio} aria-label={audioPlaying ? "Pause narration" : "Play narration"}
+                    style={{
+                      flexShrink: 0, width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                      background: D ? "rgba(255,255,255,0.07)" : S ? "rgba(101,66,20,0.12)" : "rgba(0,0,0,0.07)",
+                      border: `1px solid ${border}`, color: text, cursor: "pointer", transition: "all 0.17s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = borderHov; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = border; }}
+                  >
+                    {audioPlaying ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill={text}><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill={text}><path d="M6 4 L20 12 L6 20 Z"/></svg>
+                    )}
+                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {["female","male"].map(v => (
+                      <button key={v} onClick={() => switchVoice(v)} className="tag-pill" style={{
+                        padding: "5px 14px", fontSize: 10, borderRadius: 999,
+                        border: `1px solid ${voice === v ? tagActiveBorder : border}`,
+                        background: voice === v ? tagActiveBg : "transparent",
+                        color: voice === v ? tagActiveColor : textDim,
+                        cursor: "pointer", fontFamily: headFont, textTransform: "uppercase", letterSpacing: "0.12em", transition: "all 0.15s",
+                      }}>{v}</button>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: textDim, fontFamily: headFont }}>
+                    {audioError ? "Narration unavailable" : "Listen — British English"}
+                  </span>
+                  <audio ref={audioElRef} src={audioSrc(selected, voice)} preload="none"
+                    onPlay={() => setAudioPlaying(true)}
+                    onPause={() => setAudioPlaying(false)}
+                    onEnded={() => setAudioPlaying(false)}
+                    onError={() => setAudioError(true)}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1019,14 +1104,14 @@ function RenZuReader() {
                   style={{ flexShrink: 0, padding: "10px 22px", background: D ? "rgba(255,255,255,0.07)" : S ? "rgba(101,66,20,0.12)" : "rgba(0,0,0,0.07)", border: `1px solid ${border}`, color: text, borderRadius: 14, cursor: "pointer", fontFamily: headFont, fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", transition: "all 0.17s", whiteSpace: "nowrap" }}
                   onMouseEnter={e => { e.currentTarget.style.background = D ? "rgba(255,255,255,0.14)" : S ? "rgba(101,66,20,0.22)" : "rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor = borderHov; }}
                   onMouseLeave={e => { e.currentTarget.style.background = D ? "rgba(255,255,255,0.07)" : S ? "rgba(101,66,20,0.12)" : "rgba(0,0,0,0.07)"; e.currentTarget.style.borderColor = border; }}
-                >Ask</button>
+                >Ask Ren Zu</button>
               </div>
               {(aiLoading || aiResponse) && (
                 <div ref={aiRef} className="ai-appear" style={{ marginTop: 18, background: D ? "rgba(0,0,0,0.92)" : S ? "rgba(196,155,70,0.30)" : "rgba(253,252,249,0.82)", border: `1px solid ${border}`, borderRadius: 20, padding: "22px 24px", backdropFilter: blur, WebkitBackdropFilter: blur }}>
                   {aiQuestion && (
                     <div style={{ fontSize: 11, color: textDim, marginBottom: 14, fontStyle: "italic", fontFamily: bodyFont, borderBottom: `1px solid ${border}`, paddingBottom: 12, display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
                       <span>"{aiQuestion}"</span>
-                      <span style={{ fontSize:8, letterSpacing:"0.18em", textTransform:"uppercase", opacity:0.5, whiteSpace:"nowrap", paddingTop:2 }}>AI Scholar</span>
+                      <span style={{ fontSize:8, letterSpacing:"0.18em", textTransform:"uppercase", opacity:0.5, whiteSpace:"nowrap", paddingTop:2 }}>Ask Ren Zu</span>
                     </div>
                   )}
                   {aiLoading ? (
