@@ -546,15 +546,45 @@ function RenZuReader() {
       kokoroWorkerRef.current = null;
     }
     const workerSrc = `
-      import { KokoroTTS } from 'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js';
       let tts = null;
       let currentVoice = null;
+      let kokoroLoaded = false;
+      
+      // Load Kokoro using importScripts (more reliable than ES6 imports in Workers)
+      function loadKokoroLib() {
+        return new Promise((resolve, reject) => {
+          try {
+            importScripts('https://cdn.jsdelivr.net/npm/kokoro-js@latest/dist/kokoro.web.js');
+            // Give it time to register the global
+            setTimeout(() => {
+              if (typeof self.KokoroTTS !== 'undefined') {
+                kokoroLoaded = true;
+                resolve(self.KokoroTTS);
+              } else {
+                reject(new Error('KokoroTTS failed to load from CDN'));
+              }
+            }, 500);
+          } catch(e) {
+            reject(new Error('Failed to load Kokoro: ' + String(e)));
+          }
+        });
+      }
+      
       self.onmessage = async (e) => {
         const { type, text, voice, chunks } = e.data;
 
         if (type === 'init') {
           try {
             self.postMessage({ type: 'loading' });
+            
+            // Load KokoroTTS if not already loaded
+            let KokoroTTS;
+            if (kokoroLoaded && self.KokoroTTS) {
+              KokoroTTS = self.KokoroTTS;
+            } else {
+              KokoroTTS = await loadKokoroLib();
+            }
+            
             tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
               dtype: 'q8',
               device: 'wasm',
@@ -562,7 +592,8 @@ function RenZuReader() {
             currentVoice = voice;
             self.postMessage({ type: 'ready' });
           } catch(err) {
-            self.postMessage({ type: 'error', message: String(err) });
+            console.error('Kokoro init error:', err);
+            self.postMessage({ type: 'error', message: 'Model load failed: ' + String(err) });
           }
         } else if (type === 'generate_chunks') {
           // Process chunks sequentially so WASM memory stays bounded
@@ -575,6 +606,7 @@ function RenZuReader() {
               wavCopy.set(wavSrc);
               self.postMessage({ type: 'chunk', wav: wavCopy.buffer, index: i, total: chunks.length }, [wavCopy.buffer]);
             } catch(err) {
+              console.error('Kokoro chunk generation error at', i, ':', err);
               self.postMessage({ type: 'chunk_error', index: i, message: String(err) });
               // Continue to next chunk rather than aborting
             }
@@ -585,7 +617,7 @@ function RenZuReader() {
     `;
     const blob = new Blob([workerSrc], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
-    const worker = new Worker(url, { type: 'module' });
+    const worker = new Worker(url);
 
     worker.onmessage = async (e) => {
       const { type, wav, index, total } = e.data;
