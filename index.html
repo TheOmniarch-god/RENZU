@@ -581,7 +581,7 @@ function RenZuReader() {
 
             // Step 1 — load the JS library
             self.postMessage({ type: 'progress', label: 'Waking up Ancestor Ren Zu', percent: 0 });
-            importScripts('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js');
+            importScripts('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/dist/kokoro.web.js');
             self.postMessage({ type: 'progress', label: 'Waking up Ancestor Ren Zu', percent: 100 });
 
             // Step 2 — load the model; pipe progress through our handler
@@ -621,8 +621,10 @@ function RenZuReader() {
             try {
               const audio = await tts.generate(chunks[i], { voice });
               const wavSrc = audio.toWav();
-              const wavCopy = new Uint8Array(wavSrc.byteLength);
-              wavCopy.set(wavSrc);
+              // toWav() returns Uint8Array in some versions, handle both
+              const wavData = wavSrc instanceof Uint8Array ? wavSrc : new Uint8Array(wavSrc);
+              const wavCopy = new Uint8Array(wavData.byteLength);
+              wavCopy.set(wavData);
               self.postMessage({ type: 'chunk', wav: wavCopy.buffer, index: i, total: chunks.length }, [wavCopy.buffer]);
             } catch(err) {
               self.postMessage({ type: 'chunk_error', index: i, message: String(err) });
