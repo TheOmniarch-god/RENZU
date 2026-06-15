@@ -551,8 +551,8 @@ function RenZuReader() {
 
       // Fetch a file and report download progress back to main thread
       async function fetchWithProgress(url, label) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to fetch ' + url);
+        const res = await fetch(url, { cache: 'force-cache' });
+        if (!res.ok) throw new Error('Failed to fetch ' + url + ' (' + res.status + ')');
         const total = parseInt(res.headers.get('content-length') || '0', 10);
         const reader = res.body.getReader();
         const chunks = [];
@@ -581,7 +581,12 @@ function RenZuReader() {
 
             // Step 1 — load the JS library
             self.postMessage({ type: 'progress', label: 'Waking up Ancestor Ren Zu', percent: 0 });
-            importScripts('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/dist/kokoro.web.js');
+            // Try jsdelivr first, fall back to unpkg
+            try {
+              importScripts('https://cdn.jsdelivr.net/npm/kokoro-js@1.0.0/dist/kokoro.web.js');
+            } catch(e) {
+              importScripts('https://unpkg.com/kokoro-js@1.0.0/dist/kokoro.web.js');
+            }
             self.postMessage({ type: 'progress', label: 'Waking up Ancestor Ren Zu', percent: 100 });
 
             // Step 2 — load the model; pipe progress through our handler
@@ -608,6 +613,12 @@ function RenZuReader() {
             tts = await self.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
               dtype: 'q8',
               device: 'wasm',
+              progress_callback: (progress) => {
+                if (progress && progress.status === 'downloading') {
+                  const pct = progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0;
+                  self.postMessage({ type: 'progress', label: 'Downloading voice model', percent: pct });
+                }
+              }
             });
 
             self.fetch = originalFetch; // restore
