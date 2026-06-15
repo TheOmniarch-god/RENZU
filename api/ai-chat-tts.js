@@ -112,5 +112,4 @@ export default async function handler(req, res) {
     console.error("TTS error:", err.message);
     return res.status(502).json({ error: "TTS service failed: " + err.message });
   }
-    }
-    
+}
