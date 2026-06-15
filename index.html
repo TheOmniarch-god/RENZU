@@ -634,7 +634,7 @@ function RenZuReader() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  // ── AI Scholar — talks to our own serverless function (/.netlify/functions/ai-chat),
+  // ── AI Scholar — talks to our own serverless function (/api/ai-chat),
   //    which holds the GROQ_API_KEY / GEMINI_API_KEY server-side. No keys in the browser.
   async function askAI(question) {
     if (!selected) return;
@@ -1054,14 +1054,7 @@ function RenZuReader() {
 
             {/* ── SOCIAL LINKS ── */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, marginTop: 32 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <div style={{
-                  fontFamily: "'Cormorant Garamond', 'EB Garamond', Georgia, serif",
-                  fontStyle: "italic", fontWeight: 500, fontSize: 14,
-                  color: textDim, letterSpacing: "0.1em",
-                }}>
-                  Created by
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <img src={IMG_LOGO} alt="The Omniarch" style={{ width: 110, height: 110, objectFit: "contain", filter: "drop-shadow(0 6px 24px rgba(212,168,60,0.45))" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
