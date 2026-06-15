@@ -598,7 +598,12 @@ function RenZuReader() {
       });
 
       if (!ttsRes.ok) {
-        throw new Error(`TTS failed: ${ttsRes.status}`);
+        let errMsg = `TTS failed: ${ttsRes.status}`;
+        try {
+          const errBody = await ttsRes.json();
+          if (errBody.error) errMsg += ` — ${errBody.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
 
       const audioBlob = await ttsRes.blob();
@@ -624,7 +629,7 @@ function RenZuReader() {
     } catch (err) {
       console.error("TTS error:", err);
       setAudioError(true);
-      setAudioStatus("Audio playback failed");
+      setAudioStatus(err.message || "Audio playback failed");
       setAudioLoading(false);
       setAudioPlaying(false);
       playbackActiveRef.current = false;
