@@ -504,16 +504,6 @@ function RenZuReader() {
   const [accentRegion, setAccentRegion] = useState("british");
   const [highlightStart, setHighlightStart] = useState(0);
   const [selectionMenu, setSelectionMenu] = useState(null); // {x,y,text,sentenceIdx}
-  // ── DEBUG: visible on-screen log so popup-menu issues can be diagnosed
-  //    on a phone without needing to plug into devtools. Remove this block
-  //    (and the dbg(...) calls below) once the issue is found. ──
-  const [debugOpen, setDebugOpen] = useState(true);
-  const [debugLog, setDebugLog] = useState([]);
-  const debugMountRef = useRef(Date.now());
-  function dbg(msg) {
-    const t = ((Date.now() - debugMountRef.current) / 1000).toFixed(2);
-    setDebugLog(prev => [...prev.slice(-29), { t, msg }]);
-  }
   const chapterCanvasRef = useRef(null);
 const chapterKeyRef = useRef(null);
   const [headerSticky, setHeaderSticky] = useState(false);
@@ -728,10 +718,8 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
   function handleSentencePointerDown(sentenceIdx, sentenceText, e) {
     // Only primary pointer (finger / left-click)
     if (e.button !== undefined && e.button !== 0) {
-      dbg(`pointerdown sent#${sentenceIdx} IGNORED (button=${e.button})`);
       return;
     }
-    dbg(`pointerdown sent#${sentenceIdx} pointerType=${e.pointerType} — arming ${LONG_PRESS_MS}ms timer`);
     e.preventDefault(); // Prevent native text selection / callout on long press
     longPressMoved.current = false;
     longPressActiveIdxRef.current = sentenceIdx;
@@ -739,10 +727,9 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
     cancelLongPress();
       longPressTimerRef.current = setTimeout(() => {
     longPressTimerRef.current = null;
-    if (longPressMoved.current) { dbg(`timer fired sent#${sentenceIdx} but ABORTED (moved past threshold)`); return; } // finger drifted — it was a scroll
+    if (longPressMoved.current) { return; } // finger drifted — it was a scroll
     // Haptic feedback on supported devices
     if (navigator.vibrate) navigator.vibrate(32);
-    dbg(`LONG PRESS FIRED sent#${sentenceIdx} -> opening menu`);
     setTappedSentenceIdx(sentenceIdx);
     setSelectionMenu({ text: sentenceText, sentenceIdx });
     menuShownAtRef.current = Date.now();
@@ -755,14 +742,12 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
     const dx = e.clientX - longPressStartPos.current.x;
     const dy = e.clientY - longPressStartPos.current.y;
     if (dx * dx + dy * dy > LONG_PRESS_MOVE_THRESHOLD * LONG_PRESS_MOVE_THRESHOLD) {
-      if (!longPressMoved.current) dbg(`movement threshold exceeded (dx=${dx.toFixed(0)},dy=${dy.toFixed(0)}) -> cancelling long-press timer`);
       longPressMoved.current = true;
       cancelLongPress();
     }
   }
 
   function handleSentencePointerUp() {
-    if (longPressTimerRef.current) dbg("pointerup -> cancelling still-pending long-press timer");
     cancelLongPress();
   }
 
@@ -771,33 +756,6 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
   useEffect(() => { tappedSentenceIdxRef.current = tappedSentenceIdx; }, [tappedSentenceIdx]);
   useEffect(() => {
     selectionMenuRef.current = selectionMenu;
-    if (selectionMenu) {
-      dbg(`selectionMenu STATE SET -> popup should render (sent#${selectionMenu.sentenceIdx})`);
-      // Give React/the browser a frame to actually paint, then inspect the real DOM node.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const el = document.getElementById("sel-menu-popup");
-          if (!el) { dbg("DOM CHECK: #sel-menu-popup NOT FOUND in document — it never mounted!"); return; }
-          const r = el.getBoundingClientRect();
-          const cs = window.getComputedStyle(el);
-          dbg(`DOM CHECK: viewport = ${window.innerWidth}x${window.innerHeight}`);
-          dbg(`DOM CHECK: found element. rect = top:${r.top.toFixed(0)} left:${r.left.toFixed(0)} w:${r.width.toFixed(0)} h:${r.height.toFixed(0)}`);
-          dbg(`DOM CHECK: display=${cs.display} visibility=${cs.visibility} opacity=${cs.opacity} z-index=${cs.zIndex} position=${cs.position}`);
-          let p = el.parentElement, depth = 0;
-          while (p) {
-            const pcs = window.getComputedStyle(p);
-            const id = p.id ? `#${p.id}` : "";
-            const cls = (p.className || "").toString().slice(0, 24);
-            const flag = (pcs.transform !== "none" || pcs.filter !== "none" || pcs.position === "fixed" || pcs.position === "absolute") ? " <== SUSPECT" : "";
-            dbg(`DOM CHECK [${depth}]: ${p.tagName}${id}${cls ? "." + cls : ""} transform=${pcs.transform} position=${pcs.position}${flag}`);
-            p = p.parentElement; depth++;
-            if (depth > 20) { dbg("DOM CHECK: stopped at depth 20"); break; }
-          }
-        });
-      });
-    } else {
-      dbg("selectionMenu STATE CLEARED -> popup unmounts");
-    }
   }, [selectionMenu]);
 
   useEffect(() => {
@@ -806,21 +764,18 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
       // Guard: ignore dismiss events fired within MENU_DISMISS_GUARD_MS of the menu appearing.
       // This kills the Android finger-lift micro-movement that fires a spurious touchmove/pointerdown.
       if (Date.now() - menuShownAtRef.current < MENU_DISMISS_GUARD_MS) {
-        dbg("doc pointerdown -> ignored (inside dismiss-guard window)");
         return;
       }
       const popup = document.getElementById("sel-menu-popup");
       if (popup && popup.contains(e.target)) {
-        dbg("doc pointerdown -> ignored (target inside popup)");
         return;
       }
       // Don't dismiss if pointerdown is on a sentence span (long-press handler will deal with it)
       let el = e.target;
       while (el) {
-        if (el.dataset && "sentIdx" in el.dataset) { dbg("doc pointerdown -> ignored (target is a sentence span)"); return; }
+        if (el.dataset && "sentIdx" in el.dataset) { return; }
         el = el.parentElement;
       }
-      dbg("doc pointerdown -> DISMISSING menu (tap landed outside popup/sentence)");
       setTappedSentenceIdx(-1);
       setSelectionMenu(null);
     }
@@ -1022,7 +977,7 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
   useEffect(() => {
     function onScroll() {
       cancelLongPress();
-      if (selectionMenu) { dbg("scroll detected -> dismissing menu"); setSelectionMenu(null); setTappedSentenceIdx(-1); }
+      if (selectionMenu) { setSelectionMenu(null); setTappedSentenceIdx(-1); }
     }
     // Do NOT listen on touchmove — Android fires spurious touchmove events
     // during a long-press (sub-pixel finger tremor) which instantly dismiss
@@ -1216,8 +1171,7 @@ function getOrBuildSentences() {
                             e.preventDefault();
                             // If already active on this sentence, do nothing (prevents Android
                             // contextmenu from racing the long-press timer and toggling off).
-                            if (tappedSentenceIdxRef.current === i) { dbg(`contextmenu sent#${i} -> ignored (already active)`); return; }
-                            dbg(`contextmenu sent#${i} -> opening menu`);
+                            if (tappedSentenceIdxRef.current === i) { return; }
                             setTappedSentenceIdx(i);
                             setSelectionMenu({ text: s, sentenceIdx: i });
                             menuShownAtRef.current = Date.now();
@@ -1315,42 +1269,6 @@ function getOrBuildSentences() {
         span[data-sent-idx] { outline: none !important; -webkit-tap-highlight-color: transparent; }
         span[data-sent-idx]:focus { outline: none !important; }
       `}</style>
-
-      {/* ── DEBUG OVERLAY — temporary, for diagnosing the selection popup menu.
-          Remove this whole block (and the dbg() calls + debugLog/debugOpen state)
-          once the issue is fixed. ── */}
-      <div style={{ position: "fixed", top: 8, right: 8, zIndex: 999999, fontFamily: "monospace", fontSize: 11, maxWidth: debugOpen ? 320 : "auto" }}>
-        <button
-          onClick={() => setDebugOpen(o => !o)}
-          style={{
-            display: "block", marginLeft: "auto",
-            background: "#111", color: "#7fff7f", border: "1px solid #444",
-            borderRadius: 6, padding: "4px 8px", fontFamily: "monospace", fontSize: 11,
-            cursor: "pointer",
-          }}
-        >
-          🐞 DEBUG {debugOpen ? "▲ hide" : `▼ show (${debugLog.length})`}
-        </button>
-        {debugOpen && (
-          <div style={{
-            marginTop: 4, background: "rgba(10,10,10,0.92)", color: "#7fff7f",
-            border: "1px solid #444", borderRadius: 8, padding: 8,
-            maxHeight: "60vh", overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word",
-          }}>
-            <div style={{ color: "#fff", marginBottom: 6, borderBottom: "1px solid #444", paddingBottom: 4 }}>
-              tappedIdx: {tappedSentenceIdx}{"  "}
-              menuOpen: {selectionMenu ? `yes (sent#${selectionMenu.sentenceIdx})` : "no"}{"\n"}
-              PointerEvent: {typeof window !== "undefined" && "PointerEvent" in window ? "yes" : "NO"}{"  "}
-              ontouchstart: {typeof window !== "undefined" && "ontouchstart" in window ? "yes" : "no"}{"\n"}
-              <button onClick={() => setDebugLog([])} style={{ marginTop: 4, background: "#222", color: "#f88", border: "1px solid #555", borderRadius: 4, padding: "2px 6px", fontFamily: "monospace", fontSize: 10, cursor: "pointer" }}>clear log</button>
-            </div>
-            {debugLog.length === 0 && <div style={{ color: "#888" }}>No events yet. Try a long-press (~350ms hold, no dragging) on a sentence.</div>}
-            {debugLog.slice().reverse().map((e, idx) => (
-              <div key={idx}><span style={{ color: "#888" }}>[{e.t}s]</span> {e.msg}</div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {showIntro && <IntroScreen onDone={() => setShowIntro(false)} />}
 
@@ -1752,85 +1670,6 @@ function getOrBuildSentences() {
               </div>
             </div>
 
-            {/* ── Selection action bar — fixed to bottom, triggered by long press ── */}
-            {selectionMenu && (
-              <div id="sel-menu-popup" style={{
-                position: "fixed",
-                bottom: "max(28px, env(safe-area-inset-bottom, 28px))",
-                left: 0,
-                right: 0,
-                margin: "0 auto",
-                width: "fit-content",
-                zIndex: 9999,
-                display: "flex",
-                flexWrap: "wrap",
-                justifyContent: "center",
-                gap: 2,
-                background: D ? "rgba(18,18,22,0.97)" : S ? "rgba(42,21,4,0.96)" : "rgba(20,18,16,0.95)",
-                border: `1px solid ${D ? "rgba(255,255,255,0.14)" : S ? "rgba(180,130,40,0.35)" : "rgba(255,255,255,0.14)"}`,
-                borderRadius: 16,
-                padding: "6px 8px",
-                boxShadow: "0 8px 40px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.35)",
-                backdropFilter: "blur(24px)",
-                WebkitBackdropFilter: "blur(24px)",
-                animation: "fadeUp 0.18s ease both",
-              }}>
-                {[
-                  {
-                    icon: "⏮",
-                    label: "From Start",
-                    action: () => { readFromHere(0); }
-                  },
-                  {
-                    icon: "▶",
-                    label: "Read from Here",
-                    action: () => readFromHere(selectionMenu.sentenceIdx)
-                  },
-                  {
-                    icon: "◉",
-                    label: "Read This",
-                    action: () => readSelection(selectionMenu.text)
-                  },
-                  {
-                    icon: "✦",
-                    label: "Ask Ren Zu (AI)",
-                    action: () => {
-                      const text = selectionMenu.text;
-                      setSelectionMenu(null); setTappedSentenceIdx(-1);
-                      askAI(text);
-                    }
-                  },
-                  {
-                    icon: "📋",
-                    label: "Copy",
-                    action: () => {
-                      navigator.clipboard?.writeText(selectionMenu.text + "\n\n— The Legends of Ren Zu (Reverend Insanity · Gu Zhen Ren)").catch(() => {});
-                      setSelectionMenu(null); setTappedSentenceIdx(-1);
-                    }
-                  },
-                ].map(({ icon, label, action }) => (
-                  <button key={label}
-                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); action(); }}
-                    style={{
-                      background: "transparent", border: "none", cursor: "pointer",
-                      color: "rgba(255,255,255,0.90)", fontFamily: headFont,
-                      padding: "9px 13px", borderRadius: 10,
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                      minWidth: 52,
-                      touchAction: "manipulation",
-                      transition: "background 0.12s",
-                      WebkitTapHighlightColor: "transparent",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.10)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <span style={{ fontSize: 15 }}>{icon}</span>
-                    <span style={{ fontSize: 8.5, opacity: 0.7, letterSpacing: "0.10em", textTransform: "uppercase" }}>{label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             <div ref={chapterCanvasRef} style={{ ...sq(26), padding: "36px 40px", marginBottom: 16, position: "relative" }}
             >
               <div style={{ fontSize: 15, color: text, lineHeight: 2.05, fontFamily: bodyFont, letterSpacing: "0.008em", touchAction: "pan-y" }}>
@@ -1920,6 +1759,89 @@ function getOrBuildSentences() {
           </div>
         )}
       </div>
+
+      {/* ── Selection action bar — fixed to bottom, triggered by long press.
+          Rendered at the top level (outside the maxWidth content wrapper and
+          outside the fadeUp-animated chapter container) so that no ancestor's
+          transform/animation can ever turn into a containing block for this
+          position:fixed element and trap it off-screen. ── */}
+      {selectionMenu && (
+        <div id="sel-menu-popup" style={{
+          position: "fixed",
+          bottom: "max(28px, env(safe-area-inset-bottom, 28px))",
+          left: 0,
+          right: 0,
+          margin: "0 auto",
+          width: "fit-content",
+          zIndex: 9999,
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: 2,
+          background: D ? "rgba(18,18,22,0.97)" : S ? "rgba(42,21,4,0.96)" : "rgba(20,18,16,0.95)",
+          border: `1px solid ${D ? "rgba(255,255,255,0.14)" : S ? "rgba(180,130,40,0.35)" : "rgba(255,255,255,0.14)"}`,
+          borderRadius: 16,
+          padding: "6px 8px",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.35)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          animation: "fadeUp 0.18s ease",
+        }}>
+          {[
+            {
+              icon: "⏮",
+              label: "From Start",
+              action: () => { readFromHere(0); }
+            },
+            {
+              icon: "▶",
+              label: "Read from Here",
+              action: () => readFromHere(selectionMenu.sentenceIdx)
+            },
+            {
+              icon: "◉",
+              label: "Read This",
+              action: () => readSelection(selectionMenu.text)
+            },
+            {
+              icon: "✦",
+              label: "Ask Ren Zu (AI)",
+              action: () => {
+                const text = selectionMenu.text;
+                setSelectionMenu(null); setTappedSentenceIdx(-1);
+                askAI(text);
+              }
+            },
+            {
+              icon: "📋",
+              label: "Copy",
+              action: () => {
+                navigator.clipboard?.writeText(selectionMenu.text + "\n\n— The Legends of Ren Zu (Reverend Insanity · Gu Zhen Ren)").catch(() => {});
+                setSelectionMenu(null); setTappedSentenceIdx(-1);
+              }
+            },
+          ].map(({ icon, label, action }) => (
+            <button key={label}
+              onPointerDown={e => { e.stopPropagation(); e.preventDefault(); action(); }}
+              style={{
+                background: "transparent", border: "none", cursor: "pointer",
+                color: "rgba(255,255,255,0.90)", fontFamily: headFont,
+                padding: "9px 13px", borderRadius: 10,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                minWidth: 52,
+                touchAction: "manipulation",
+                transition: "background 0.12s",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.10)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <span style={{ fontSize: 15 }}>{icon}</span>
+              <span style={{ fontSize: 8.5, opacity: 0.7, letterSpacing: "0.10em", textTransform: "uppercase" }}>{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
