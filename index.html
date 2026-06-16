@@ -695,27 +695,33 @@ function RenZuReader() {
     return out;
   }
 
-  // ── Long-press to select (Kindle/Moon+ Reader style) ──
-  // Long press on any sentence highlights it and shows the action bar.
-  // No event race with scroll — the timer is cancelled on any movement.
+  // ── Long-press → native selection → selectionchange → popup ──
+  // The long-press timer fires haptic + programmatically selects the sentence span
+  // in the browser's native Selection API. selectionchange then fires → we show the
+  // popup. This is completely decoupled from pointer-up, so the finger-lift race
+  // condition that killed the popup in the same frame is gone entirely.
   const [tappedSentenceIdx, setTappedSentenceIdx] = useState(-1);
   const longPressTimerRef = useRef(null);
   const longPressActiveIdxRef = useRef(-1);
   const longPressMoved = useRef(false);
   const longPressStartPos = useRef({ x: 0, y: 0 });
-  const tappedSentenceIdxRef = useRef(-1); // mirrors tappedSentenceIdx, read inside the timer closure
-  const menuShownAtRef = useRef(0); // timestamp when the selection menu last appeared
+  const tappedSentenceIdxRef = useRef(-1);
+  const selectionMenuRef = useRef(null);
+  // Track whether the current native selection was set by us (suppress dismiss on our own selectionchange)
+  const ourSelectionRef = useRef(false);
 
   const LONG_PRESS_MS = 420;
-  const LONG_PRESS_MOVE_THRESHOLD = 8; // px — ignore sub-pixel tremor, only cancel on real movement
-  const MENU_DISMISS_GUARD_MS = 500; // ms — ignore dismiss events fired right after menu appears
+  const LONG_PRESS_MOVE_THRESHOLD = 8;
 
   function cancelLongPress() {
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
   }
 
+  function clearNativeSelection() {
+    try { window.getSelection()?.removeAllRanges(); } catch (_) {}
+  }
+
   function handleSentencePointerDown(sentenceIdx, sentenceText, e) {
-    // Only primary pointer (finger / left-click)
     if (e.button !== undefined && e.button !== 0) return;
     longPressMoved.current = false;
     longPressActiveIdxRef.current = sentenceIdx;
@@ -723,24 +729,38 @@ function RenZuReader() {
     cancelLongPress();
     longPressTimerRef.current = setTimeout(() => {
       longPressTimerRef.current = null;
-      if (longPressMoved.current) return; // finger drifted — it was a scroll
-      // Haptic feedback on supported devices
+      if (longPressMoved.current) return;
+      // Haptic feedback
       if (navigator.vibrate) navigator.vibrate(32);
+
       if (tappedSentenceIdxRef.current === sentenceIdx) {
         // Long press same sentence = dismiss
         setTappedSentenceIdx(-1);
         setSelectionMenu(null);
+        clearNativeSelection();
+        return;
+      }
+
+      // Programmatically select the sentence span text so the browser draws
+      // native selection handles AND fires selectionchange → our listener shows popup.
+      const span = document.querySelector(`[data-sent-idx="${sentenceIdx}"]`);
+      if (span) {
+        ourSelectionRef.current = true;
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        // ourSelectionRef guard is cleared by selectionchange listener after it fires
       } else {
+        // Fallback: no span found, set state directly
         setTappedSentenceIdx(sentenceIdx);
         setSelectionMenu({ text: sentenceText, sentenceIdx });
-        menuShownAtRef.current = Date.now();
       }
     }, LONG_PRESS_MS);
   }
 
   function handleSentencePointerMove(e) {
-    // Only treat as a scroll once the pointer has actually traveled past the
-    // threshold — tiny sub-pixel jitter on mobile shouldn't kill the timer.
     const dx = e.clientX - longPressStartPos.current.x;
     const dy = e.clientY - longPressStartPos.current.y;
     if (dx * dx + dy * dy > LONG_PRESS_MOVE_THRESHOLD * LONG_PRESS_MOVE_THRESHOLD) {
@@ -753,20 +773,66 @@ function RenZuReader() {
     cancelLongPress();
   }
 
-  // ── Dismiss on tap outside (not inside popup, not on a sentence span) ──
-  const selectionMenuRef = useRef(null);
+  // ── selectionchange listener: shows popup whenever the browser selection
+  //    lands on a sentence span (whether from our long-press or user drag) ──
+  useEffect(() => {
+    function onSelectionChange() {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+        // Selection cleared — dismiss popup only if it wasn't cleared by a button action
+        // (button actions call clearNativeSelection then set state themselves)
+        if (!ourSelectionRef.current) {
+          setTappedSentenceIdx(-1);
+          setSelectionMenu(null);
+        }
+        ourSelectionRef.current = false;
+        return;
+      }
+
+      // Find the sentence span that contains the anchor node
+      let node = sel.anchorNode;
+      let span = null;
+      while (node && node !== document.body) {
+        if (node.nodeType === 1 && node.dataset && "sentIdx" in node.dataset) { span = node; break; }
+        node = node.parentElement;
+      }
+
+      if (!span) {
+        ourSelectionRef.current = false;
+        return;
+      }
+
+      const sentenceIdx = parseInt(span.dataset.sentIdx, 10);
+      const text = sel.toString().trim() || span.textContent.trim();
+
+      ourSelectionRef.current = false; // guard consumed
+
+      setTappedSentenceIdx(sentenceIdx);
+      tappedSentenceIdxRef.current = sentenceIdx;
+      setSelectionMenu({ text, sentenceIdx });
+    }
+
+    // Suppress Android native context menu
+    function onContextMenu(e) { e.preventDefault(); }
+
+    document.addEventListener("selectionchange", onSelectionChange);
+    document.addEventListener("contextmenu", onContextMenu, { capture: true });
+    return () => {
+      document.removeEventListener("selectionchange", onSelectionChange);
+      document.removeEventListener("contextmenu", onContextMenu, { capture: true });
+    };
+  }, []);
+
+  // ── Dismiss on tap outside popup ──
   useEffect(() => { tappedSentenceIdxRef.current = tappedSentenceIdx; }, [tappedSentenceIdx]);
   useEffect(() => { selectionMenuRef.current = selectionMenu; }, [selectionMenu]);
 
   useEffect(() => {
     function onDocPointerDown(e) {
-      if (tappedSentenceIdxRef.current < 0 && !selectionMenuRef.current) return;
-      // Guard: ignore dismiss events fired within MENU_DISMISS_GUARD_MS of the menu appearing.
-      // This kills the Android finger-lift micro-movement that fires a spurious touchmove/pointerdown.
-      if (Date.now() - menuShownAtRef.current < MENU_DISMISS_GUARD_MS) return;
+      if (!selectionMenuRef.current) return;
       const popup = document.getElementById("sel-menu-popup");
       if (popup && popup.contains(e.target)) return;
-      // Don't dismiss if pointerdown is on a sentence span (long-press handler will deal with it)
+      // Tapping a sentence span will re-trigger long-press or selectionchange — let those handle it
       let el = e.target;
       while (el) {
         if (el.dataset && "sentIdx" in el.dataset) return;
@@ -774,17 +840,10 @@ function RenZuReader() {
       }
       setTappedSentenceIdx(-1);
       setSelectionMenu(null);
-    }
-    // Prevent Android's native long-press context menu from stealing the event
-    function onContextMenu(e) {
-      e.preventDefault();
+      clearNativeSelection();
     }
     document.addEventListener("pointerdown", onDocPointerDown, true);
-    document.addEventListener("contextmenu", onContextMenu, { capture: true });
-    return () => {
-      document.removeEventListener("pointerdown", onDocPointerDown, true);
-      document.removeEventListener("contextmenu", onContextMenu, { capture: true });
-    };
+    return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
   }, []);
 
   function toggleAudio() {
@@ -973,7 +1032,7 @@ function RenZuReader() {
   useEffect(() => {
     function onScroll() {
       cancelLongPress();
-      if (selectionMenu) { setSelectionMenu(null); setTappedSentenceIdx(-1); }
+      if (selectionMenu) { clearNativeSelection(); setSelectionMenu(null); setTappedSentenceIdx(-1); }
     }
     document.addEventListener("touchmove", onScroll, { passive: true });
     window.addEventListener("scroll", onScroll, true);
@@ -1151,7 +1210,6 @@ function RenZuReader() {
     // Long-press select mode: every sentence responds to long press
     if (sentences.length > 0) {
       return sentences.map((s, i) => {
-        const isActive = i === tappedSentenceIdx;
         return (
           <span
             key={i}
@@ -1162,20 +1220,14 @@ function RenZuReader() {
             onPointerCancel={handleSentencePointerUp}
             style={{
               cursor: "default",
-              background: isActive
-                ? (D ? "rgba(255,255,255,0.13)" : S ? "rgba(139,94,26,0.20)" : "rgba(212,168,60,0.28)")
-                : "transparent",
               borderRadius: 3,
-              boxShadow: isActive
-                ? `0 0 0 1.5px ${D ? "rgba(255,255,255,0.28)" : S ? "rgba(139,94,26,0.40)" : "rgba(200,150,30,0.48)"}`
-                : "none",
               transition: "background 0.18s, box-shadow 0.18s",
               WebkitTapHighlightColor: "transparent",
               outline: "none",
               touchAction: "pan-y",
               pointerEvents: "auto",
-              userSelect: "none",
-              WebkitUserSelect: "none",
+              userSelect: "text",
+              WebkitUserSelect: "text",
             }}
           >
             {highlightThemed(s, query, S, D)}{" "}
@@ -1677,22 +1729,23 @@ function RenZuReader() {
                   {
                     icon: "⏮",
                     label: "From Start",
-                    action: () => { readFromHere(0); }
+                    action: () => { clearNativeSelection(); readFromHere(0); }
                   },
                   {
                     icon: "▶",
                     label: "From Here",
-                    action: () => readFromHere(selectionMenu.sentenceIdx)
+                    action: () => { clearNativeSelection(); readFromHere(selectionMenu.sentenceIdx); }
                   },
                   {
                     icon: "◉",
                     label: "Read This",
-                    action: () => readSelection(selectionMenu.text)
+                    action: () => { clearNativeSelection(); readSelection(selectionMenu.text); }
                   },
                   {
                     icon: "✦",
                     label: "Ask AI",
                     action: () => {
+                      clearNativeSelection();
                       setSelectionMenu(null); setTappedSentenceIdx(-1);
                       if (customRef.current) {
                         customRef.current.value = selectionMenu.text;
@@ -1706,6 +1759,7 @@ function RenZuReader() {
                     label: "Copy",
                     action: () => {
                       navigator.clipboard?.writeText(selectionMenu.text + "\n\n— The Legends of Ren Zu (Reverend Insanity · Gu Zhen Ren)").catch(() => {});
+                      clearNativeSelection();
                       setSelectionMenu(null); setTappedSentenceIdx(-1);
                     }
                   },
