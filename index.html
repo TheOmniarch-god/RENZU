@@ -1693,7 +1693,7 @@ function getOrBuildSentences() {
                   },
                   {
                     icon: "▶",
-                    label: "From Here",
+                    label: "Read from Here",
                     action: () => readFromHere(selectionMenu.sentenceIdx)
                   },
                   {
@@ -1703,14 +1703,11 @@ function getOrBuildSentences() {
                   },
                   {
                     icon: "✦",
-                    label: "Ask AI",
+                    label: "Ask Ren Zu (AI)",
                     action: () => {
+                      const text = selectionMenu.text;
                       setSelectionMenu(null); setTappedSentenceIdx(-1);
-                      if (customRef.current) {
-                        customRef.current.value = selectionMenu.text;
-                        customRef.current.focus();
-                        customRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-                      }
+                      askAI(text);
                     }
                   },
                   {
