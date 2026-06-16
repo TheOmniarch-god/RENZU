@@ -1,8 +1,68 @@
 // api/ai-chat-tts.js
 //
 // TTS endpoint for Vercel serverless functions
-// Uses Google Cloud Text-to-Speech (free tier: 4M chars/month)
+// Uses Google Cloud Text-to-Speech with Service Account auth
+// Free tier: 4 million characters/month (Neural2 voices)
 //
+
+async function getAccessToken(serviceAccountJson) {
+  const sa = JSON.parse(serviceAccountJson);
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  };
+
+  // Encode header and payload
+  const enc = (obj) => Buffer.from(JSON.stringify(obj)).toString("base64url");
+  const signingInput = `${enc(header)}.${enc(payload)}`;
+
+  // Import the private key
+  const pemBody = sa.private_key
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\s/g, "");
+  const keyBuffer = Buffer.from(pemBody, "base64");
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyBuffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  // Sign
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    Buffer.from(signingInput)
+  );
+  const jwt = `${signingInput}.${Buffer.from(signature).toString("base64url")}`;
+
+  // Exchange JWT for access token
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const err = await tokenRes.text();
+    throw new Error(`Token exchange failed: ${err.slice(0, 200)}`);
+  }
+
+  const { access_token } = await tokenRes.json();
+  return access_token;
+}
 
 function createWavHeader(audioDataLength) {
   const sampleRate = 24000;
@@ -36,9 +96,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const googleKey = process.env.GEMINI_API_KEY;
-  if (!googleKey) {
-    return res.status(500).json({ error: "Google TTS not configured. Set GEMINI_API_KEY in environment variables." });
+  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!serviceAccountJson) {
+    return res.status(500).json({ error: "Google Service Account not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in environment variables." });
   }
 
   const { text, voice } = typeof req.body === "object" ? req.body : (() => {
@@ -54,11 +114,16 @@ export default async function handler(req, res) {
   }
 
   try {
+    const accessToken = await getAccessToken(serviceAccountJson);
+
     const ttsRes = await fetch(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
+      "https://texttospeech.googleapis.com/v1/text:synthesize",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           input: { text },
           voice: {
@@ -86,16 +151,10 @@ export default async function handler(req, res) {
     const base64Audio = data.audioContent;
 
     if (!base64Audio) {
-      console.error("No audio content in response");
       return res.status(502).json({ error: "No audio content in response" });
     }
 
     const audioBuffer = Buffer.from(base64Audio, "base64");
-
-    if (audioBuffer.length === 0) {
-      return res.status(502).json({ error: "Audio buffer is empty" });
-    }
-
     const wavHeader = createWavHeader(audioBuffer.length);
     const wavData = Buffer.concat([wavHeader, audioBuffer]);
 
