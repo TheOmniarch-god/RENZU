@@ -128,15 +128,11 @@ export default async function handler(req, res) {
           input: { text },
           voice: {
             languageCode: "en-US",
-            // Male: en-US-Neural2-D — deep, authoritative male narrator voice
-            // Female: en-US-Neural2-C — mature, rich female narrator voice
-            name: voice === "male" ? "en-US-Neural2-D" : "en-US-Neural2-C",
+            name: voice,
           },
           audioConfig: {
             audioEncoding: "LINEAR16",
             sampleRateHertz: 24000,
-            // Extra pitch reduction for a deeper, more aged storyteller quality
-            pitch: voice === "male" ? -6 : -3,
             speakingRate: 0.88,
             effectsProfileId: ["large-home-entertainment-class-device"],
           },
