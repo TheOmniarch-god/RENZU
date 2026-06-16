@@ -180,7 +180,6 @@ export default async function handler(req, res) {
             audioEncoding: "LINEAR16",
             sampleRateHertz: 24000,
             speakingRate: finalRate,
-            effectsProfileId: ["large-home-entertainment-class-device"],
           },
         }),
       }
