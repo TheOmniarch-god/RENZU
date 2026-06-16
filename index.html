@@ -505,6 +505,7 @@ function RenZuReader() {
   const [highlightStart, setHighlightStart] = useState(0);
   const [selectionMenu, setSelectionMenu] = useState(null); // {x,y,text,sentenceIdx}
   const chapterCanvasRef = useRef(null);
+const chapterKeyRef = useRef(null);
   const [headerSticky, setHeaderSticky] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioPaused, setAudioPaused] = useState(false);
@@ -706,8 +707,8 @@ function RenZuReader() {
   const tappedSentenceIdxRef = useRef(-1); // mirrors tappedSentenceIdx, read inside the timer closure
   const menuShownAtRef = useRef(0); // timestamp when the selection menu last appeared
 
-  const LONG_PRESS_MS = 420;
-  const LONG_PRESS_MOVE_THRESHOLD = 8; // px — ignore sub-pixel tremor, only cancel on real movement
+const LONG_PRESS_MS = 350;
+const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only cancel on real movement
   const MENU_DISMISS_GUARD_MS = 500; // ms — ignore dismiss events fired right after menu appears
 
   function cancelLongPress() {
@@ -717,33 +718,20 @@ function RenZuReader() {
   function handleSentencePointerDown(sentenceIdx, sentenceText, e) {
     // Only primary pointer (finger / left-click)
     if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault(); // Prevent native text selection / callout on long press
     longPressMoved.current = false;
     longPressActiveIdxRef.current = sentenceIdx;
     longPressStartPos.current = { x: e.clientX, y: e.clientY };
     cancelLongPress();
-    longPressTimerRef.current = setTimeout(() => {
-      longPressTimerRef.current = null;
-      if (longPressMoved.current) return; // finger drifted — it was a scroll
-      // Haptic feedback on supported devices
-      if (navigator.vibrate) navigator.vibrate(32);
-      // Defer by one frame so pointer-up / touchend events from the finger lift
-      // have already fired and been processed before we show the popup.
-      // Without this, Android fires pointer-up in the same microtask batch as the
-      // timer callback, which triggers the dismiss handler and kills the popup
-      // in the same frame it was created.
-      setTimeout(() => {
-        if (longPressMoved.current) return; // re-check in case scroll started during defer
-        if (tappedSentenceIdxRef.current === sentenceIdx) {
-          // Long press same sentence = dismiss
-          setTappedSentenceIdx(-1);
-          setSelectionMenu(null);
-        } else {
-          setTappedSentenceIdx(sentenceIdx);
-          setSelectionMenu({ text: sentenceText, sentenceIdx });
-          menuShownAtRef.current = Date.now();
-        }
-      }, 0);
-    }, LONG_PRESS_MS);
+      longPressTimerRef.current = setTimeout(() => {
+    longPressTimerRef.current = null;
+    if (longPressMoved.current) return; // finger drifted — it was a scroll
+    // Haptic feedback on supported devices
+    if (navigator.vibrate) navigator.vibrate(32);
+    setTappedSentenceIdx(sentenceIdx);
+    setSelectionMenu({ text: sentenceText, sentenceIdx });
+    menuShownAtRef.current = Date.now();
+  }, LONG_PRESS_MS);
   }
 
   function handleSentencePointerMove(e) {
@@ -983,10 +971,11 @@ function RenZuReader() {
       cancelLongPress();
       if (selectionMenu) { setSelectionMenu(null); setTappedSentenceIdx(-1); }
     }
-    document.addEventListener("touchmove", onScroll, { passive: true });
+    // Do NOT listen on touchmove — Android fires spurious touchmove events
+    // during a long-press (sub-pixel finger tremor) which instantly dismiss
+    // the menu before the user can see it.
     window.addEventListener("scroll", onScroll, true);
     return () => {
-      document.removeEventListener("touchmove", onScroll);
       window.removeEventListener("scroll", onScroll, true);
     };
   }, [selectionMenu]);
@@ -1129,12 +1118,14 @@ function RenZuReader() {
 
   // Sentences are always split from restOfBody (body minus the drop-cap letter)
   // so the big first letter never appears twice.
-  function getOrBuildSentences() {
-    if (sentencesRef.current.length === 0 && selected) {
-      sentencesRef.current = splitSentences(restOfBody);
+function getOrBuildSentences() {
+    const key = selected ? selected.num : null;
+    if (chapterKeyRef.current !== key || sentencesRef.current.length === 0) {
+        chapterKeyRef.current = key;
+        sentencesRef.current = selected ? splitSentences(restOfBody) : [];
     }
     return sentencesRef.current;
-  }
+}
 
   // Build sentence-highlighted body for narration mode OR tap-select mode
   function renderBodyWithHighlight() {
@@ -1161,31 +1152,41 @@ function RenZuReader() {
       return sentences.map((s, i) => {
         const isActive = i === tappedSentenceIdx;
         return (
-          <span
-            key={i}
-            data-sent-idx={i}
-            onPointerDown={e => handleSentencePointerDown(i, s, e)}
-            onPointerMove={handleSentencePointerMove}
-            onPointerUp={handleSentencePointerUp}
-            onPointerCancel={handleSentencePointerUp}
-            style={{
-              cursor: "default",
-              background: isActive
-                ? (D ? "rgba(255,255,255,0.13)" : S ? "rgba(139,94,26,0.20)" : "rgba(212,168,60,0.28)")
-                : "transparent",
-              borderRadius: 3,
-              boxShadow: isActive
-                ? `0 0 0 1.5px ${D ? "rgba(255,255,255,0.28)" : S ? "rgba(139,94,26,0.40)" : "rgba(200,150,30,0.48)"}`
-                : "none",
-              transition: "background 0.18s, box-shadow 0.18s",
-              WebkitTapHighlightColor: "transparent",
-              outline: "none",
-              touchAction: "pan-y",
-              pointerEvents: "auto",
-              userSelect: "none",
-              WebkitUserSelect: "none",
-            }}
-          >
+                    <span
+                        key={i}
+                        data-sent-idx={i}
+                        onPointerDown={e => handleSentencePointerDown(i, s, e)}
+                        onPointerMove={handleSentencePointerMove}
+                        onPointerUp={handleSentencePointerUp}
+                        onPointerCancel={handleSentencePointerUp}
+                        onContextMenu={e => {
+                            e.preventDefault();
+                            // If already active on this sentence, do nothing (prevents Android
+                            // contextmenu from racing the long-press timer and toggling off).
+                            if (tappedSentenceIdxRef.current === i) return;
+                            setTappedSentenceIdx(i);
+                            setSelectionMenu({ text: s, sentenceIdx: i });
+                            menuShownAtRef.current = Date.now();
+                        }}
+                        style={{
+                            cursor: "default",
+                            background: isActive
+                                ? (D ? "rgba(255,255,255,0.13)" : S ? "rgba(139,94,26,0.20)" : "rgba(212,168,60,0.28)")
+                                : "transparent",
+                            borderRadius: 3,
+                            boxShadow: isActive
+                                ? `0 0 0 1.5px ${D ? "rgba(255,255,255,0.28)" : S ? "rgba(139,94,26,0.40)" : "rgba(200,150,30,0.48)"}`
+                                : "none",
+                            transition: "background 0.18s, box-shadow 0.18s",
+                            WebkitTapHighlightColor: "transparent",
+                            WebkitTouchCallout: "none",
+                            outline: "none",
+                            touchAction: "pan-y",
+                            pointerEvents: "auto",
+                            userSelect: "none",
+                            WebkitUserSelect: "none",
+                        }}
+                    >
             {highlightThemed(s, query, S, D)}{" "}
           </span>
         );
@@ -1236,7 +1237,7 @@ function RenZuReader() {
         .card-in:nth-child(8)  { animation-delay: 0.28s; }
         .card-in:nth-child(n+9){ animation-delay: 0.32s; }
         input::placeholder { color: ${textDim}; font-family: ${headFont}; }
-        * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+        * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         .selectable, .selectable * { -webkit-user-select: text !important; user-select: text !important; }
         html { scrollbar-width: thin; scrollbar-color: ${borderHov} transparent; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1666,10 +1667,14 @@ function RenZuReader() {
               <div id="sel-menu-popup" style={{
                 position: "fixed",
                 bottom: "max(28px, env(safe-area-inset-bottom, 28px))",
-                left: "50%",
-                transform: "translateX(-50%)",
+                left: 0,
+                right: 0,
+                margin: "0 auto",
+                width: "fit-content",
                 zIndex: 9999,
                 display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
                 gap: 2,
                 background: D ? "rgba(18,18,22,0.97)" : S ? "rgba(42,21,4,0.96)" : "rgba(20,18,16,0.95)",
                 border: `1px solid ${D ? "rgba(255,255,255,0.14)" : S ? "rgba(180,130,40,0.35)" : "rgba(255,255,255,0.14)"}`,
@@ -1679,7 +1684,6 @@ function RenZuReader() {
                 backdropFilter: "blur(24px)",
                 WebkitBackdropFilter: "blur(24px)",
                 animation: "fadeUp 0.18s ease both",
-                whiteSpace: "nowrap",
               }}>
                 {[
                   {
@@ -1845,5 +1849,5 @@ function RenZuReader() {
       });
     }
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0ccb427982a6f21',t:'MTc4MTY0MzIwMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
