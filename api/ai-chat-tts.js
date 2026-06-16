@@ -101,7 +101,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Google Service Account not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in environment variables." });
   }
 
-  const { text, voice } = typeof req.body === "object" ? req.body : (() => {
+  const { text, voice, speakingRate } = typeof req.body === "object" ? req.body : (() => {
     try { return JSON.parse(req.body || "{}"); } catch (_) { return {}; }
   })();
 
@@ -141,6 +141,8 @@ export default async function handler(req, res) {
       [/\bGu Masters?\b/g, '<phoneme alphabet="ipa" ph="ɡuː mɑːstər">Gu Master</phoneme>'],
       // "Gu Zhen Ren" (author name)
       [/\bGu Zhen Ren\b/g, '<phoneme alphabet="ipa" ph="ɡuː ʒɛn rɛn">Gu Zhen Ren</phoneme>'],
+      // Replace periods with subtle pause — 350ms is just noticeable, not intrusive
+      [/\./g, '.<break time="350ms"/>'],
     ];
 
     for (const [pattern, replacement] of subs) {
@@ -172,7 +174,7 @@ export default async function handler(req, res) {
           audioConfig: {
             audioEncoding: "LINEAR16",
             sampleRateHertz: 24000,
-            speakingRate: 0.88,
+            speakingRate: speakingRate || 0.88,
             effectsProfileId: ["large-home-entertainment-class-device"],
           },
         }),
