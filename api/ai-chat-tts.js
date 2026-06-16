@@ -113,6 +113,45 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Text too long (max 5000 characters)" });
   }
 
+  // Derive language code from voice name (e.g. "en-GB-Neural2-B" → "en-GB")
+  const langCode = (voice && voice.startsWith("en-GB")) ? "en-GB" : "en-US";
+
+  // Preprocessing: fix contextual pronunciations via SSML phonemes.
+  // "Gu" is read as "G-U" (acronym). Force it to sound like "goo".
+  // Other cultivation / proper nouns that get mangled are fixed below.
+  function applyPhonemes(raw) {
+    // Escape XML special chars first
+    let s = raw
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+    // Pronunciation fixes — order matters (longest match first)
+    const subs = [
+      // "Gu Worm(s)" — keep as one phrase, "goo worm"
+      [/\bGu Worms?\b/g, '<phoneme alphabet="ipa" ph="ɡuː wɜːm">Gu Worm</phoneme>'],
+      // "Ren Zu" — "ren zoo"
+      [/\bRen Zu\b/g, '<phoneme alphabet="ipa" ph="rɛn zuː">Ren Zu</phoneme>'],
+      // Standalone "Gu" (the worm/concept) — "goo"
+      [/\bGu\b/g, '<phoneme alphabet="ipa" ph="ɡuː">Gu</phoneme>'],
+      // "Fang Yuan" — "fahng yüen"
+      [/\bFang Yuan\b/g, '<phoneme alphabet="ipa" ph="fɑːŋ yɛn">Fang Yuan</phoneme>'],
+      // "Gu Master(s)"
+      [/\bGu Masters?\b/g, '<phoneme alphabet="ipa" ph="ɡuː mɑːstər">Gu Master</phoneme>'],
+      // "Gu Zhen Ren" (author name)
+      [/\bGu Zhen Ren\b/g, '<phoneme alphabet="ipa" ph="ɡuː ʒɛn rɛn">Gu Zhen Ren</phoneme>'],
+    ];
+
+    for (const [pattern, replacement] of subs) {
+      s = s.replace(pattern, replacement);
+    }
+
+    return `<speak>${s}</speak>`;
+  }
+
+  const ssml = applyPhonemes(text);
+
   try {
     const accessToken = await getAccessToken(serviceAccountJson);
 
@@ -125,9 +164,9 @@ export default async function handler(req, res) {
           "Authorization": `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          input: { text },
+          input: { ssml },
           voice: {
-            languageCode: "en-US",
+            languageCode: langCode,
             name: voice,
           },
           audioConfig: {
