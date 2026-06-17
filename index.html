@@ -451,6 +451,200 @@ function highlightThemed(text, q, S, D) {
   );
 }
 
+// ─── Billing / Paywall Modal — support audio before use ───────────────────────
+function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S }) {
+  const [code, setCode] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  if (!open) return null;
+
+  const border = D ? "rgba(255,255,255,0.10)" : S ? "rgba(180,130,40,0.40)" : "rgba(0,0,0,0.12)";
+  const surface = D ? "rgba(8,8,10,0.96)" : S ? "rgba(245,230,200,0.96)" : "rgba(255,255,255,0.98)";
+  const text = D ? "#dddbd5" : S ? "#2a1502" : "#0d0c09";
+  const textDim = D ? "#9a9890" : S ? "#7a4e18" : "#6a6660";
+  const headFont = "Metamorphous, 'Palatino Linotype', Georgia, serif";
+
+  function tryUnlock() {
+    const clean = code.trim().toLowerCase();
+    // In production, replace this with a backend verification call.
+    // Demo codes: "renzu" grants Immortal (unlimited), "stones" grants 500 credits.
+    // Admin code: "omniarch" grants the owner permanent free access.
+    if (clean === "renzu" || clean === "omniarch") {
+      setError("");
+      onUnlock("immortal");
+    } else if (clean === "stones") {
+      setError("");
+      onUnlock("credits");
+    } else {
+      setError("Invalid token. Cultivators receive a token after offering essence.");
+    }
+  }
+
+  function copyCrypto() {
+    navigator.clipboard?.writeText("YOUR_USDT_TRC20_ADDRESS").then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  const Tier = ({ title, price, desc, icon, primary, href, onClick }) => (
+    <div style={{
+      padding: "14px 16px", borderRadius: 16, border: `1px solid ${primary ? border : "transparent"}`,
+      background: primary
+        ? (D ? "rgba(255,255,255,0.07)" : S ? "rgba(139,94,26,0.18)" : "rgba(0,0,0,0.05)")
+        : (D ? "rgba(255,255,255,0.03)" : S ? "rgba(139,94,26,0.10)" : "rgba(0,0,0,0.03)"),
+      textAlign: "left",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 22 }}>{icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: headFont, fontSize: 13, fontWeight: 700, color: text }}>{title}</div>
+          <div style={{ fontSize: 11, color: textDim, marginTop: 2 }}>{desc}</div>
+        </div>
+        <div style={{ fontFamily: headFont, fontSize: 14, fontWeight: 700, color: text }}>{price}</div>
+      </div>
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: "block", textAlign: "center", padding: "9px 16px", borderRadius: 12,
+            background: primary ? (S ? "#c79a3b" : D ? "rgba(255,255,255,0.13)" : "#1a1a1a") : "transparent",
+            color: primary ? (S ? "#1f0f02" : "#fff") : text, fontFamily: headFont, fontSize: 12, fontWeight: 600,
+            border: `1px solid ${border}`, textDecoration: "none", transition: "transform 0.15s",
+          }}>
+          Enter Treasure Yellow Heaven
+        </a>
+      ) : (
+        <button onClick={onClick}
+          style={{
+            width: "100%", padding: "9px 16px", borderRadius: 12,
+            background: "transparent", color: text, fontFamily: headFont, fontSize: 12, fontWeight: 600,
+            border: `1px solid ${border}`, cursor: "pointer",
+          }}>
+          Current State
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 10000,
+      background: "rgba(0,0,0,0.78)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      animation: "fadeUp 0.22s ease",
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: "min(440px, 94vw)", maxHeight: "90vh", overflow: "auto",
+        background: surface, border: `1px solid ${border}`, borderRadius: 26,
+        boxShadow: "0 28px 90px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,255,255,0.04)",
+        padding: "30px 26px 24px", textAlign: "center", position: "relative",
+      }}>
+        <button onClick={onClose} style={{
+          position: "absolute", top: 12, right: 14, width: 32, height: 32, borderRadius: "50%",
+          background: "transparent", border: "none", color: textDim, fontSize: 18, cursor: "pointer",
+        }}>✕</button>
+
+        <div style={{ fontSize: 42, marginBottom: 8 }}>🏛️</div>
+        <div style={{ fontFamily: headFont, fontSize: 20, fontWeight: 700, color: text, marginBottom: 6 }}>
+          Treasure Yellow Heaven
+        </div>
+        <div style={{ fontSize: 13, color: textDim, lineHeight: 1.55, marginBottom: 20, fontFamily: "'IM Fell English', Georgia, serif" }}>
+          Your primeval aperture is dry. The heavens demand a toll. Trade essence stones to continue your cultivation, lest you stagnate on the mortal path.
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+          <Tier
+            title="Mortal Aperture"
+            price="Free"
+            desc="3 chats & 1 narration per day. Resets at midnight."
+            icon="🌀"
+            onClick={() => {}}
+          />
+          <Tier
+            title="Pouch of Primeval Stones"
+            price="$4.99"
+            desc="500 API credits. One-time purchase."
+            icon="💎"
+            primary
+            href={`https://paystack.com/pay/YOUR_PAYSTACK_CREDITS_LINK?deviceId=${encodeURIComponent(deviceId || '')}&plan=credits`}
+          />
+          <Tier
+            title="Immortal Essence Stones"
+            price="$9.99/mo"
+            desc="Gu Immortal status. Unlimited chat & audio."
+            icon="✨"
+            primary
+            href={`https://paystack.com/pay/YOUR_PAYSTACK_SUBSCRIPTION_LINK?deviceId=${encodeURIComponent(deviceId || '')}&plan=immortal`}
+          />
+
+          <button onClick={copyCrypto}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              padding: "11px 22px", borderRadius: 14, border: `1px solid ${border}`,
+              background: "transparent", color: text, fontFamily: headFont, fontSize: 12, cursor: "pointer",
+            }}>
+            {copied ? "✓ USDT (TRC-20) copied" : "₿ Copy USDT (TRC-20) Address"}
+          </button>
+        </div>
+
+        <div style={{ height: 1, background: border, margin: "8px 0 14px" }} />
+
+        <div style={{ fontSize: 10, color: textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: headFont, marginBottom: 8 }}>
+          Cultivator token (received after offering)
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            value={code}
+            onChange={e => { setCode(e.target.value); setError(""); }}
+            placeholder="Enter token"
+            onKeyDown={e => { if (e.key === "Enter") tryUnlock(); }}
+            style={{
+              flex: 1, minWidth: 0, padding: "10px 14px", borderRadius: 12, fontSize: 12,
+              background: D ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+              border: `1px solid ${error ? "tomato" : border}`, color: text, fontFamily: "inherit", outline: "none",
+            }}
+          />
+          <button onClick={tryUnlock}
+            style={{
+              padding: "10px 16px", borderRadius: 12, border: `1px solid ${border}`,
+              background: "transparent", color: text, fontSize: 12, cursor: "pointer", fontFamily: headFont, fontWeight: 600,
+            }}>Refine</button>
+        </div>
+        {error && <div style={{ fontSize: 11, color: "tomato", marginTop: 6 }}>{error}</div>}
+
+        <button onClick={onClose}
+          style={{
+            padding: "8px 16px", borderRadius: 14, border: "none", background: "transparent",
+            color: textDim, fontSize: 11, cursor: "pointer", fontFamily: "inherit", marginTop: 12,
+          }}>
+          Return to the mortal world
+        </button>
+
+        {/* Lore glossary */}
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => setGlossaryOpen(o => !o)}
+            style={{
+              background: "transparent", border: "none", color: textDim, fontSize: 10,
+              cursor: "pointer", fontFamily: headFont, letterSpacing: "0.1em", textTransform: "uppercase",
+            }}>
+            {glossaryOpen ? "Close Lore Glossary ▲" : "Lore Glossary ▼"}
+          </button>
+          {glossaryOpen && (
+            <div style={{ marginTop: 10, textAlign: "left", fontSize: 11, color: textDim, lineHeight: 1.7, padding: "10px 14px", borderRadius: 12, border: `1px solid ${border}`, background: D ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)" }}>
+              <strong>Mortal Aperture</strong> — The dantian-like space where a mortal Gu Master stores primeval essence. Here it represents your free daily allowance.<br />
+              <strong>Primeval Essence</strong> — The energy used to activate Gu. In this app, it is consumed by the AI chat and TTS narration.<br />
+              <strong>Primeval Stones</strong> — Mortal currency used to replenish essence. Buy a pouch to gain credits.<br />
+              <strong>Immortal Essence Stones</strong> — The currency of Gu Immortals. Subscribing grants unlimited primeval essence.<br />
+              <strong>Treasure Yellow Heaven</strong> — A legendary grotto-heaven marketplace where cultivators trade treasures for essence stones.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 function RenZuReader() {
   // ── Font loader — runs in user's browser, not sandbox
@@ -513,6 +707,16 @@ const chapterKeyRef = useRef(null);
   const [audioError, setAudioError] = useState(false);
   const [audioStatus, setAudioStatus] = useState("");
   const [activeSentenceIdx, setActiveSentenceIdx] = useState(-1);
+  // ── Cultivation billing / essence state ───────────────────────────────
+  const [deviceId, setDeviceId] = useState(null);
+  const [dailyChatUsed, setDailyChatUsed] = useState(0);
+  const [dailyAudioUsed, setDailyAudioUsed] = useState(0);
+  const [purchasedCredits, setPurchasedCredits] = useState(0);
+  const [isImmortal, setIsImmortal] = useState(false);
+  const [lastResetDate, setLastResetDate] = useState(null);
+  const [showTreasure, setShowTreasure] = useState(false);
+  const [essenceLoading, setEssenceLoading] = useState(false);
+  const [backendMode, setBackendMode] = useState('local'); // 'api' | 'local'
   const utteranceRef = useRef(null);
   const sentenceIndexRef = useRef(0);
   const sentencesRef = useRef([]);
@@ -525,6 +729,173 @@ const chapterKeyRef = useRef(null);
   const customRef = useRef(null);
   const topRef   = useRef(null);
 
+  // ── Cultivation billing / essence helpers ────────────────────────────
+  const DAILY_CHAT_LIMIT = 3;
+  const DAILY_AUDIO_LIMIT = 1;
+  const CHAT_COST = 1;
+  const AUDIO_COST = 5;
+
+  function getTodayKey() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function generateDeviceId() {
+    return 'd-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36);
+  }
+
+  // Load local state and deviceId on mount, then sync with backend
+  useEffect(() => {
+    let id;
+    try {
+      id = localStorage.getItem("renzu_device_id");
+      if (!id) {
+        id = generateDeviceId();
+        localStorage.setItem("renzu_device_id", id);
+      }
+      setDeviceId(id);
+    } catch (_) {
+      id = generateDeviceId();
+      setDeviceId(id);
+    }
+
+    try {
+      const saved = localStorage.getItem("renzu_essence");
+      if (saved) {
+        const data = JSON.parse(saved);
+        const today = getTodayKey();
+        if (data.lastResetDate === today) {
+          setDailyChatUsed(data.dailyChatUsed || 0);
+          setDailyAudioUsed(data.dailyAudioUsed || 0);
+        } else {
+          setDailyChatUsed(0);
+          setDailyAudioUsed(0);
+        }
+        setPurchasedCredits(data.purchasedCredits || 0);
+        setIsImmortal(data.isImmortal || false);
+        setLastResetDate(today);
+      }
+    } catch (_) {}
+
+    syncWithBackend(id);
+  }, []);
+
+  async function syncWithBackend(id) {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/me?deviceId=${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error("Backend unavailable");
+      const data = await res.json();
+      setDailyChatUsed(data.dailyChatUsed || 0);
+      setDailyAudioUsed(data.dailyAudioUsed || 0);
+      setPurchasedCredits(data.purchasedCredits || 0);
+      setIsImmortal(data.isImmortal || false);
+      setBackendMode("api");
+    } catch (err) {
+      setBackendMode("local");
+    }
+  }
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("renzu_essence", JSON.stringify({
+        dailyChatUsed,
+        dailyAudioUsed,
+        purchasedCredits,
+        isImmortal,
+        lastResetDate: getTodayKey(),
+      }));
+    } catch (_) {}
+  }, [dailyChatUsed, dailyAudioUsed, purchasedCredits, isImmortal]);
+
+  function resetDailyIfNeeded() {
+    const today = getTodayKey();
+    if (lastResetDate !== today) {
+      setDailyChatUsed(0);
+      setDailyAudioUsed(0);
+      setLastResetDate(today);
+    }
+  }
+
+  async function deductEssence(type) {
+    resetDailyIfNeeded();
+    if (!deviceId) return false;
+    if (isImmortal) return true;
+
+    setEssenceLoading(true);
+
+    // Try backend first
+    if (backendMode === "api") {
+      try {
+        const res = await fetch("/api/use-credit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId, type }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.remainingCredits !== undefined) setPurchasedCredits(data.remainingCredits);
+          if (data.remaining !== undefined) {
+            if (type === "chat") setDailyChatUsed(DAILY_CHAT_LIMIT - data.remaining);
+            else setDailyAudioUsed(DAILY_AUDIO_LIMIT - data.remaining);
+          }
+          setEssenceLoading(false);
+          return true;
+        }
+        if (res.status === 402) {
+          setEssenceLoading(false);
+          setShowTreasure(true);
+          return false;
+        }
+        throw new Error(data.error);
+      } catch (err) {
+        setBackendMode("local");
+      }
+    }
+
+    // Local fallback
+    const cost = type === "chat" ? CHAT_COST : AUDIO_COST;
+    if (purchasedCredits >= cost) {
+      setPurchasedCredits(c => c - cost);
+      setEssenceLoading(false);
+      return true;
+    }
+    const dailyUsed = type === "chat" ? dailyChatUsed : dailyAudioUsed;
+    const limit = type === "chat" ? DAILY_CHAT_LIMIT : DAILY_AUDIO_LIMIT;
+    if (dailyUsed < limit) {
+      if (type === "chat") setDailyChatUsed(c => c + 1);
+      else setDailyAudioUsed(c => c + 1);
+      setEssenceLoading(false);
+      return true;
+    }
+    setEssenceLoading(false);
+    setShowTreasure(true);
+    return false;
+  }
+
+  function unlockAudio(tier) {
+    if (tier === "immortal") {
+      setIsImmortal(true);
+    } else if (tier === "credits") {
+      setPurchasedCredits(c => c + 500);
+    }
+    setShowTreasure(false);
+    syncWithBackend(deviceId);
+  }
+
+  const essenceStatus = () => {
+    if (essenceLoading) return backendMode === "api" ? "Communing with heaven..." : "Sensing aperture...";
+    if (isImmortal) return "Gu Immortal — unlimited essence";
+    const parts = [];
+    if (purchasedCredits > 0) parts.push(`${purchasedCredits} Primeval Stones`);
+    const today = getTodayKey();
+    if (lastResetDate !== today) {
+      parts.push(`Mortal: ${DAILY_CHAT_LIMIT} chats, ${DAILY_AUDIO_LIMIT} audio today`);
+    } else {
+      parts.push(`Mortal: ${Math.max(0, DAILY_CHAT_LIMIT - dailyChatUsed)} chats, ${Math.max(0, DAILY_AUDIO_LIMIT - dailyAudioUsed)} audio left`);
+    }
+    if (backendMode === "local") parts.push("(local mode)");
+    return parts.join(" · ");
+  };
   const filtered = TAGGED.filter(c => {
     const q = query.toLowerCase();
     return (!q || c.title.toLowerCase().includes(q) || c.body.toLowerCase().includes(q))
@@ -791,11 +1162,11 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
     };
   }, []);
 
-  function toggleAudio() {
+  async function toggleAudio() {
     if (audioLoading) return;
     if (!selected) return;
 
-    // If currently playing → pause
+    // If currently playing → pause (no essence cost)
     if (audioPlaying && !audioPaused) {
       pausedRef.current = true;
       setAudioPaused(true);
@@ -810,7 +1181,7 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
       return;
     }
 
-    // If paused → resume (just flip the flag; the running chain's wait-loop will continue)
+    // If paused → resume (no essence cost)
     if (audioPaused) {
       pausedRef.current = false;
       setAudioPaused(false);
@@ -821,7 +1192,9 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
       return;
     }
 
-    // Fresh start
+    // Fresh start — deduct essence
+    const hasEssence = await deductEssence("audio");
+    if (!hasEssence) return;
     stopAllAudio();
     setSelectionMenu(null);
     setTappedSentenceIdx(-1);
@@ -843,8 +1216,10 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
   }
 
   // ── Read from here — start narration at a specific sentence index ──
-  function readFromHere(sentenceIdx) {
+  async function readFromHere(sentenceIdx) {
     if (!selected) return;
+    const hasEssence = await deductEssence("audio");
+    if (!hasEssence) return;
     stopAllAudio();
     setAudioError(false);
     setAudioLoading(true);
@@ -868,6 +1243,8 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
   // ── Read selection — speak only the highlighted text then stop ──
   async function readSelection(text) {
     if (!text || !text.trim()) return;
+    const hasEssence = await deductEssence("audio");
+    if (!hasEssence) return;
     stopAllAudio();
     setAudioError(false);
     setAudioLoading(true);
@@ -990,6 +1367,8 @@ const LONG_PRESS_MOVE_THRESHOLD = 16; // px — ignore sub-pixel tremor, only ca
   //    which holds the GROQ_API_KEY / GEMINI_API_KEY server-side. No keys in the browser.
   async function askAI(question) {
     if (!selected) return;
+    const hasEssence = await deductEssence("chat");
+    if (!hasEssence) return;
     setAiLoading(true); setAiResponse(""); setAiQuestion(question); setAiStreaming(false);
     setTimeout(() => aiRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
@@ -1521,7 +1900,7 @@ function getOrBuildSentences() {
                     return (
                       <div style={{ ...sq(20), padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                           {/* Play/pause button */}
-                          <button onClick={toggleAudio} aria-label={audioPlaying ? "Pause" : audioPaused ? "Resume" : "Play"}
+                          <button onClick={() => toggleAudio()} aria-label={audioPlaying ? "Pause" : audioPaused ? "Resume" : "Play"}
                             disabled={audioLoading}
                             style={{
                               flexShrink: 0, width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
@@ -1589,7 +1968,7 @@ function getOrBuildSentences() {
                               : audioPlaying ? "Ren Zu Is Speaking…"
                               : audioPaused ? "Paused"
                               : audioLoading ? "Summoning…"
-                              : ""}
+                              : essenceStatus()}
                           </span>
 
                         {/* Voice picker dropdown with region tabs and highlight feature */}
@@ -1681,7 +2060,10 @@ function getOrBuildSentences() {
                 <span style={{ fontSize: 16, color: textDim, letterSpacing: 4 }}>· · ·</span>
                 <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${border} 50%, transparent)` }} />
               </div>
-              <div style={{ fontSize: 9, color: textDim, letterSpacing: "0.28em", textTransform: "uppercase", marginBottom: 14, textAlign: "center", fontFamily: headFont }}>Discuss this chapter</div>
+              <div style={{ fontSize: 9, color: textDim, letterSpacing: "0.28em", textTransform: "uppercase", marginBottom: 6, textAlign: "center", fontFamily: headFont }}>Discuss this chapter</div>
+              <div style={{ fontSize: 10, color: textDim, textAlign: "center", marginBottom: 14, fontFamily: "'IM Fell English', Georgia, serif", fontStyle: "italic" }}>
+                {essenceStatus()}
+              </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                 {["What does this reveal about human nature?","What's the hidden cultivation insight?","How does this connect to Fang Yuan?","Why does this hit so hard?"].map(q => (
                   <button key={q} onClick={() => askAI(q)} className="prompt-btn" style={{ padding: "6px 14px", fontSize: 11, background: "transparent", border: `1px solid ${border}`, color: textMid, borderRadius: 999, cursor: "pointer", fontFamily: headFont, transition: "all 0.17s" }}>{q}</button>
@@ -1831,6 +2213,18 @@ function getOrBuildSentences() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* ── Treasure Yellow Heaven — cultivation billing modal ── */}
+      {showTreasure && (
+        <TreasureYellowHeaven
+          open={showTreasure}
+          onClose={() => setShowTreasure(false)}
+          onUnlock={unlockAudio}
+          deviceId={deviceId}
+          D={D}
+          S={S}
+        />
       )}
     </div>
   );
