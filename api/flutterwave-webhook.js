@@ -63,7 +63,7 @@ async function sendCodeEmail(email, code, tier) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "The Omniarch <onboarding@resend.dev>",
+      from: "The Omniarch <noreply@theomniarch.com.ng>",
       to: email,
       subject: `Your ${tierName} Realm Access Code`,
       html: `
