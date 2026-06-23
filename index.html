@@ -723,6 +723,7 @@ function PaymentRecoveryModal({ data, onClose, onRedeem, onRetry, D, S }) {
   const textDim = D ? "#9a9890" : S ? "#7a4e18" : "#6a6660";
   const headFont = "Metamorphous, 'Palatino Linotype', Georgia, serif";
   const failed = data.status && data.status !== "successful";
+  const isPreview = !!data.preview;
 
   function copyCode() {
     if (!data.code) return;
@@ -756,11 +757,13 @@ function PaymentRecoveryModal({ data, onClose, onRedeem, onRetry, D, S }) {
         </div>
 
         <div style={{ fontSize: 13, color: textDim, lineHeight: 1.6, marginBottom: 16, fontFamily: "'IM Fell English', Georgia, serif" }}>
-          {failed
-            ? "Flutterwave returned you without a successful payment. If you were charged, contact support with the transaction reference below."
-            : data.code
-              ? "If the email delays or never arrives, you can still claim your realm right here or copy the code for later."
-              : "Your payment redirect worked. Heaven is now waiting for the webhook to finish refining your access code. This can take a few seconds."}
+          {isPreview
+            ? "This is a local debug preview of the fallback recovery flow. It does not depend on a real payment or webhook."
+            : failed
+              ? "Flutterwave returned you without a successful payment. If you were charged, contact support with the transaction reference below."
+              : data.code
+                ? "If the email delays or never arrives, you can still claim your realm right here or copy the code for later."
+                : "Your payment redirect worked. Heaven is now waiting for the webhook to finish refining your access code. This can take a few seconds."}
         </div>
 
         {data.txRef && (
@@ -796,16 +799,18 @@ function PaymentRecoveryModal({ data, onClose, onRedeem, onRetry, D, S }) {
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-              <button onClick={onRedeem}
-                disabled={data.redeeming}
-                style={{
-                  padding: "10px 16px", borderRadius: 12, border: `1px solid ${border}`,
-                  background: D ? "rgba(255,255,255,0.13)" : S ? "#c79a3b" : "#1a1a1a",
-                  color: D ? "#fff" : S ? "#1f0f02" : "#fff", fontSize: 12, cursor: "pointer", fontFamily: headFont, fontWeight: 600,
-                  opacity: data.redeeming ? 0.7 : 1,
-                }}>
-                {data.redeeming ? "Claiming…" : "Claim realm now"}
-              </button>
+              {!isPreview && (
+                <button onClick={onRedeem}
+                  disabled={data.redeeming}
+                  style={{
+                    padding: "10px 16px", borderRadius: 12, border: `1px solid ${border}`,
+                    background: D ? "rgba(255,255,255,0.13)" : S ? "#c79a3b" : "#1a1a1a",
+                    color: D ? "#fff" : S ? "#1f0f02" : "#fff", fontSize: 12, cursor: "pointer", fontFamily: headFont, fontWeight: 600,
+                    opacity: data.redeeming ? 0.7 : 1,
+                  }}>
+                  {data.redeeming ? "Claiming…" : "Claim realm now"}
+                </button>
+              )}
               <button onClick={copyCode}
                 style={{
                   padding: "10px 16px", borderRadius: 12, border: `1px solid ${border}`,
@@ -2001,7 +2006,8 @@ const chapterKeyRef = useRef(null);
     tier: "",
     loading: false,
     error: "",
-    redeeming: false
+    redeeming: false,
+    preview: false
   });
   const [essenceLoading, setEssenceLoading] = useState(false);
   const [ascensionTier, setAscensionTier] = useState(null);
@@ -2072,7 +2078,8 @@ const chapterKeyRef = useRef(null);
         tier: "",
         loading: false,
         error: "Missing transaction reference.",
-        redeeming: false
+        redeeming: false,
+        preview: false
       });
       return;
     }
@@ -2087,7 +2094,8 @@ const chapterKeyRef = useRef(null);
       error: "",
       code: attempt === 0 ? "" : prev.code,
       tier: attempt === 0 ? "" : prev.tier,
-      redeeming: false
+      redeeming: false,
+      preview: false
     }));
 
     try {
@@ -2105,7 +2113,8 @@ const chapterKeyRef = useRef(null);
           tier: data.tier || "",
           loading: false,
           error: "",
-          redeeming: false
+          redeeming: false,
+          preview: false
         }));
         return;
       }
@@ -2125,7 +2134,8 @@ const chapterKeyRef = useRef(null);
         transactionId,
         loading: false,
         error: data.error || "The code is not ready yet. Try again in a few seconds.",
-        redeeming: false
+        redeeming: false,
+        preview: false
       }));
     } catch (err) {
       setPaymentReturn(prev => ({
@@ -2136,7 +2146,8 @@ const chapterKeyRef = useRef(null);
         transactionId,
         loading: false,
         error: "Could not check for your code right now. Try again shortly.",
-        redeeming: false
+        redeeming: false,
+        preview: false
       }));
     }
   }
@@ -2168,7 +2179,8 @@ const chapterKeyRef = useRef(null);
         tier: "",
         loading: false,
         error: "",
-        redeeming: false
+        redeeming: false,
+        preview: false
       });
       unlockAudio(data.tier);
     } catch (err) {
@@ -2192,7 +2204,57 @@ const chapterKeyRef = useRef(null);
       tier: "",
       loading: false,
       error: "",
-      redeeming: false
+      redeeming: false,
+      preview: false
+    });
+  }
+
+  function previewPaymentRecovery(mode = "ready") {
+    cancelPaymentLookup();
+
+    if (mode === "failed") {
+      setPaymentReturn({
+        visible: true,
+        status: "failed",
+        txRef: "debug-flw-failed-001",
+        transactionId: "debug-failed",
+        code: "",
+        tier: "",
+        loading: false,
+        error: "",
+        redeeming: false,
+        preview: true
+      });
+      return;
+    }
+
+    if (mode === "pending") {
+      setPaymentReturn({
+        visible: true,
+        status: "successful",
+        txRef: "debug-flw-pending-001",
+        transactionId: "debug-pending",
+        code: "",
+        tier: "gu_master",
+        loading: true,
+        error: "",
+        redeeming: false,
+        preview: true
+      });
+      return;
+    }
+
+    setPaymentReturn({
+      visible: true,
+      status: "successful",
+      txRef: "debug-flw-ready-001",
+      transactionId: "debug-ready",
+      code: "fateweaver-ab12cd",
+      tier: "gu_immortal",
+      loading: false,
+      error: "",
+      redeeming: false,
+      preview: true
     });
   }
 
@@ -2239,9 +2301,15 @@ const chapterKeyRef = useRef(null);
     if (!deviceId) return;
 
     const params = new URLSearchParams(window.location.search || "");
+    const debugPayment = params.get("debug_payment") || params.get("debugPayment") || "";
     const txRef = params.get("tx_ref") || params.get("txRef") || "";
     const status = params.get("status") || "";
     const transactionId = params.get("transaction_id") || params.get("transactionId") || "";
+
+    if (debugPayment) {
+      previewPaymentRecovery(debugPayment);
+      return () => cancelPaymentLookup();
+    }
 
     if (!txRef && !status) return;
 
@@ -2255,7 +2323,8 @@ const chapterKeyRef = useRef(null);
         tier: "",
         loading: false,
         error: "",
-        redeeming: false
+        redeeming: false,
+        preview: false
       });
       return;
     }
@@ -4042,6 +4111,19 @@ function getOrBuildSentences() {
               }}
             >
               {t.replace("_", " ")}
+            </button>
+          ))}
+          {["ready", "pending", "failed"].map((m) => (
+            <button
+              key={`pay-${m}`}
+              onClick={() => previewPaymentRecovery(m)}
+              style={{
+                fontSize: 11, padding: "6px 10px", borderRadius: 6,
+                border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,200,120,0.10)",
+                color: "#fff", cursor: "pointer",
+              }}
+            >
+              pay {m}
             </button>
           ))}
           <button
