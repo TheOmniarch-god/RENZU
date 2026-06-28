@@ -484,7 +484,7 @@ const GU_POOL_ORDERED = [
 ];
 
 // ─── Billing / Paywall Modal — support audio before use ───────────────────────
-function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S }) {
+function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuthHeaders }) {
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -513,15 +513,22 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S }) {
     }
     // Backend redeem for real lore-themed payment codes.
     try {
+      const authHeaders = getAuthHeaders ? await getAuthHeaders() : {};
+
       const res = await fetch("/api/redeem-code", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ deviceId, code: clean }),
       });
       const data = await res.json();
       if (data.success) {
         setError("");
         onUnlock(data.tier);
+      } else if (data.loginRequired || res.status === 401) {
+        setError(data.error || "Bind your soul before redeeming heavenly treasure.");
       } else {
         setError(data.error || "Invalid token.");
       }
@@ -2338,9 +2345,14 @@ const chapterKeyRef = useRef(null);
     setPaymentReturn(prev => ({ ...prev, redeeming: true, error: "" }));
 
     try {
+      const authHeaders = await getAuthHeaders();
+
       const res = await fetch("/api/redeem-code", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders
+        },
         body: JSON.stringify({ deviceId, code: paymentReturn.code.trim().toLowerCase() })
       });
       const data = await res.json().catch(() => ({}));
@@ -4424,6 +4436,7 @@ function getOrBuildSentences() {
           deviceId={deviceId}
           D={D}
           S={S}
+          getAuthHeaders={getAuthHeaders}
         />
       )}
 
