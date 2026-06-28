@@ -1102,7 +1102,7 @@ function CodexModal({ open, onClose, D, S, collectedGu }) {
   );
 }
 
-function NavigationMenu({ open, onToggle, onClose, D, S, onHome, onContinue, onProfile, onCodex, hasContinue }) {
+function NavigationMenu({ open, onToggle, onClose, D, S, onHome, onContinue, onProfile, onCodex, onTreasure, hasContinue }) {
   const border = D ? "rgba(255,255,255,0.12)" : S ? "rgba(180,130,40,0.42)" : "rgba(0,0,0,0.12)";
   const surface = D ? "rgba(8,8,10,0.94)" : S ? "rgba(245,230,200,0.95)" : "rgba(255,255,255,0.95)";
   const text = D ? "#ece7db" : S ? "#2a1502" : "#11100d";
@@ -1111,6 +1111,7 @@ function NavigationMenu({ open, onToggle, onClose, D, S, onHome, onContinue, onP
   const menuItems = [
     { id: "continue", label: "Continue Reading", note: hasContinue ? "Jump to last entry" : "No recent entry yet", onClick: () => { onClose(); if (hasContinue) onContinue(); }, disabled: !hasContinue },
     { id: "profile", label: "Profile", note: "Realm and identity", onClick: () => { onClose(); onProfile(); }, disabled: false },
+    { id: "treasure", label: "Treasure Heaven", note: "Ascend or redeem tokens", onClick: () => { onClose(); onTreasure(); }, disabled: false },
     { id: "codex", label: "Codex", note: "Gu gallery and lore", onClick: () => { onClose(); onCodex(); }, disabled: false },
     { id: "home", label: "Home", note: "Return to archive", onClick: () => { onClose(); onHome(); }, disabled: false },
   ];
@@ -3845,6 +3846,7 @@ function getOrBuildSentences() {
                   onHome={goHome}
                   onContinue={continueReading}
                   onProfile={() => setShowProfile(true)}
+                  onTreasure={() => setShowTreasure(true)}
                   onCodex={() => setShowCodex(true)}
                   hasContinue={!!continueChapter}
                 />
