@@ -544,6 +544,43 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuth
     }).catch(() => {});
   }
 
+  const REALM_SIGILS = {
+    mortal: { glyph: "凡", ring: "#8a6b32", glow: "rgba(138,107,50,0.25)" },
+    gu_master: { glyph: "蛊", ring: "#d8a34d", glow: "rgba(216,163,77,0.35)" },
+    gu_immortal: { glyph: "仙", ring: "#62e8ff", glow: "rgba(98,232,255,0.30)" },
+    venerable: { glyph: "尊", ring: "#ffd36a", glow: "rgba(255,211,106,0.42)" },
+  };
+
+  function RealmSeal({ type, strong }) {
+    const cfg = REALM_SIGILS[type] || REALM_SIGILS.mortal;
+    return (
+      <span style={{
+        width: 38,
+        height: 38,
+        borderRadius: "50%",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        color: strong ? "#fff7df" : cfg.ring,
+        fontFamily: headFont,
+        fontSize: 18,
+        fontWeight: 800,
+        lineHeight: 1,
+        background: strong
+          ? `radial-gradient(circle at 50% 34%, rgba(255,255,245,0.28), ${cfg.glow} 42%, rgba(10,8,6,0.42) 100%)`
+          : D
+            ? "rgba(255,255,255,0.04)"
+            : S
+              ? "rgba(139,94,26,0.08)"
+              : "rgba(0,0,0,0.035)",
+        border: `1px solid ${cfg.ring}`,
+        boxShadow: `0 0 18px ${cfg.glow}, inset 0 1px 0 rgba(255,255,255,0.16)`,
+        textShadow: `0 0 10px ${cfg.glow}`,
+      }}>{cfg.glyph}</span>
+    );
+  }
+
   const Tier = ({ title, realm, price, desc, icon, primary, href, onClick }) => (
     <div style={{
       padding: "14px 16px", borderRadius: 16, border: `1px solid ${primary ? border : "transparent"}`,
@@ -553,7 +590,7 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuth
       textAlign: "left",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <span style={{ fontSize: 22 }}>{icon}</span>
+        <RealmSeal type={icon} strong={primary} />
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: headFont, fontSize: 13, fontWeight: 700, color: text }}>{title}</div>
           <div style={{ fontSize: 10, color: textDim, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>{realm}</div>
@@ -616,7 +653,7 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuth
             realm="Free Realm"
             price="Free"
             desc="2 narrations + 3 chats per day. Resets at midnight."
-            icon="🌀"
+            icon="mortal"
             onClick={() => {}}
           />
           <Tier
@@ -624,7 +661,7 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuth
             realm="42 Narrations + 100 Chats"
             price="$4.99 one-time"
             desc="Full book + 5 extra narrations. 100 Ask Ren Zu questions."
-            icon="💎"
+            icon="gu_master"
             primary
             href={`https://flutterwave.com/pay/ivirsw2dc4bm?deviceId=${encodeURIComponent(deviceId || '')}&plan=gu_master`}
           />
@@ -633,7 +670,7 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuth
             realm="500 Narrations + Unlimited Chat"
             price="$9.99 one-time"
             desc="Listen to the entire book 11+ times. Unlimited Ask Ren Zu."
-            icon="✨"
+            icon="gu_immortal"
             primary
             href={`https://flutterwave.com/pay/c6h0pfa6oisd?deviceId=${encodeURIComponent(deviceId || '')}&plan=gu_immortal`}
           />
@@ -642,7 +679,7 @@ function TreasureYellowHeaven({ open, onClose, onUnlock, deviceId, D, S, getAuth
             realm="Everything Forever"
             price="$29.99 one-time"
             desc="Unlimited narrations + chat. Supreme supporter."
-            icon="👑"
+            icon="venerable"
             primary
             href={`https://flutterwave.com/pay/rhmf6ndvpanr?deviceId=${encodeURIComponent(deviceId || '')}&plan=venerable`}
           />
@@ -1109,9 +1146,8 @@ function NavigationMenu({ open, onToggle, onClose, D, S, onHome, onContinue, onP
   const textDim = D ? "#9d998f" : S ? "#7a4e18" : "#706b64";
 
   const menuItems = [
-    { id: "continue", label: "Continue Reading", note: hasContinue ? "Jump to last entry" : "No recent entry yet", onClick: () => { onClose(); if (hasContinue) onContinue(); }, disabled: !hasContinue },
     { id: "profile", label: "Profile", note: "Realm and identity", onClick: () => { onClose(); onProfile(); }, disabled: false },
-    { id: "treasure", label: "Treasure Heaven", note: "Ascend or redeem tokens", onClick: () => { onClose(); onTreasure(); }, disabled: false },
+    { id: "treasure", label: "Treasure Yellow Heaven", note: "Ascend or redeem realm tokens", onClick: () => { onClose(); onTreasure(); }, disabled: false },
     { id: "codex", label: "Codex", note: "Gu gallery and lore", onClick: () => { onClose(); onCodex(); }, disabled: false },
     { id: "home", label: "Home", note: "Return to archive", onClick: () => { onClose(); onHome(); }, disabled: false },
   ];
@@ -2678,10 +2714,10 @@ const chapterKeyRef = useRef(null);
 
   function getTierIcon() {
     switch (tier) {
-      case "venerable": return "👑";
-      case "gu_immortal": return "✨";
-      case "gu_master": return "💎";
-      default: return "🌀";
+      case "venerable": return "尊";
+      case "gu_immortal": return "仙";
+      case "gu_master": return "蛊";
+      default: return "凡";
     }
   }
 
@@ -3918,20 +3954,6 @@ function getOrBuildSentences() {
           )}
         </div>
 
-        {!showIntro && (
-          <NavigationMenu
-            open={showNavMenu}
-            onToggle={() => setShowNavMenu(v => !v)}
-            onClose={() => setShowNavMenu(false)}
-            D={D}
-            S={S}
-            onHome={goHome}
-            onContinue={continueReading}
-            onProfile={() => setShowProfile(true)}
-            onCodex={() => setShowCodex(true)}
-            hasContinue={!!continueChapter}
-          />
-        )}
         </div>
       </div>
 
@@ -3989,12 +4011,29 @@ function getOrBuildSentences() {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div title={essenceStatus()} style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "5px 12px", borderRadius: 999,
-                  background: D ? "rgba(255,255,255,0.06)" : S ? "rgba(139,94,26,0.12)" : "rgba(0,0,0,0.05)",
-                  border: `1px solid ${border}`, color: text, fontFamily: headFont, fontSize: 11,
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "5px 12px 5px 6px", borderRadius: 999,
+                  background: D
+                    ? "linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.035))"
+                    : S
+                      ? "linear-gradient(180deg, rgba(139,94,26,0.16), rgba(139,94,26,0.08))"
+                      : "linear-gradient(180deg, rgba(255,255,255,0.82), rgba(0,0,0,0.035))",
+                  border: `1px solid ${border}`,
+                  color: text,
+                  fontFamily: headFont,
+                  fontSize: 11,
+                  boxShadow: D ? "inset 0 1px 0 rgba(255,255,255,0.07)" : "inset 0 1px 0 rgba(255,255,255,0.65)",
                 }}>
-                  <span>{getTierIcon()}</span>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: "50%",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: headFont, fontSize: 12, fontWeight: 800,
+                    color: D ? "#f5d082" : S ? "#5d3509" : "#8a5b18",
+                    background: D ? "rgba(216,163,77,0.12)" : S ? "rgba(139,94,26,0.12)" : "rgba(216,163,77,0.11)",
+                    border: `1px solid ${D ? "rgba(245,208,130,0.28)" : S ? "rgba(93,53,9,0.28)" : "rgba(138,91,24,0.24)"}`,
+                    boxShadow: D ? "0 0 14px rgba(216,163,77,0.16)" : "0 0 12px rgba(138,91,24,0.10)",
+                    lineHeight: 1,
+                  }}>{getTierIcon()}</span>
                   <span>{getTierName()}</span>
                 </div>
                 <ThemeCycler mode={mode} onClick={cycleMode} />
