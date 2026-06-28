@@ -1141,7 +1141,7 @@ function CodexModal({ open, onClose, D, S, collectedGu }) {
 
 function NavigationMenu({ open, onToggle, onClose, D, S, onHome, onContinue, onProfile, onCodex, onTreasure, hasContinue }) {
   const border = D ? "rgba(255,255,255,0.12)" : S ? "rgba(180,130,40,0.42)" : "rgba(0,0,0,0.12)";
-  const surface = D ? "rgba(8,8,10,0.94)" : S ? "rgba(245,230,200,0.95)" : "rgba(255,255,255,0.95)";
+  const surface = D ? "#09090c" : S ? "#f2dfb6" : "#fffaf0";
   const text = D ? "#ece7db" : S ? "#2a1502" : "#11100d";
   const textDim = D ? "#9d998f" : S ? "#7a4e18" : "#706b64";
 
@@ -4010,7 +4010,13 @@ function getOrBuildSentences() {
                 {query || theme !== "all" ? `${filtered.length} ${filtered.length === 1 ? "result" : "results"}` : "44 chapters · 42 entries"}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div title={essenceStatus()} style={{
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setShowTreasure(true)}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") setShowTreasure(true); }}
+                  title={`${essenceStatus()} · Open Treasure Yellow Heaven`}
+                  style={{
                   display: "flex", alignItems: "center", gap: 8,
                   padding: "5px 12px 5px 6px", borderRadius: 999,
                   background: D
@@ -4022,8 +4028,13 @@ function getOrBuildSentences() {
                   color: text,
                   fontFamily: headFont,
                   fontSize: 11,
+                  cursor: "pointer",
+                  transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
                   boxShadow: D ? "inset 0 1px 0 rgba(255,255,255,0.07)" : "inset 0 1px 0 rgba(255,255,255,0.65)",
-                }}>
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.borderColor = borderHov; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = border; }}
+                >
                   <span style={{
                     width: 24, height: 24, borderRadius: "50%",
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
