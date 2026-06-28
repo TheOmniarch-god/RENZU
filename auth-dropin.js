@@ -429,27 +429,25 @@
       .rz-auth-gate::before {
         content: "";
         position: absolute;
-        inset: -18%;
+        inset: 0;
         pointer-events: none;
-        opacity: 0.38;
+        opacity: 0.10;
         background:
-          linear-gradient(65deg, transparent 0 46%, rgba(216,163,77,0.20) 46.2% 46.6%, transparent 46.8%),
-          linear-gradient(115deg, transparent 0 52%, rgba(216,163,77,0.14) 52.2% 52.6%, transparent 52.8%),
-          radial-gradient(circle at 50% 44%, transparent 0 20%, rgba(216,163,77,0.10) 20.3% 20.8%, transparent 21.1%);
-        transform: rotate(-4deg);
+          radial-gradient(circle at 22% 18%, rgba(216,163,77,0.22), transparent 24%),
+          radial-gradient(circle at 82% 82%, rgba(216,163,77,0.12), transparent 28%);
       }
 
       .rz-auth-gate-watermark {
         position: absolute;
-        right: -145px;
-        top: 20px;
-        width: min(620px, 92vw);
-        height: min(620px, 92vw);
+        right: -250px;
+        bottom: -190px;
+        width: min(640px, 90vw);
+        height: min(640px, 90vw);
         z-index: 1;
         pointer-events: none;
-        opacity: 0.105;
+        opacity: 0.075;
         transform: rotate(-12deg);
-        filter: drop-shadow(0 0 26px rgba(216,163,77,0.24));
+        filter: drop-shadow(0 0 26px rgba(216,163,77,0.20));
       }
 
       .rz-auth-gate-watermark .rz-fate-spider {
@@ -479,8 +477,8 @@
       }
 
       html[data-renzu-auth-theme="light"] .rz-auth-gate-watermark {
-        opacity: 0.09;
-        filter: drop-shadow(0 0 18px rgba(120,75,18,0.16));
+        opacity: 0.055;
+        filter: drop-shadow(0 0 14px rgba(120,75,18,0.12));
       }
 
       html[data-renzu-auth-theme="light"] .rz-auth-gate-watermark .rz-spider-head,
@@ -670,6 +668,29 @@
         border-color: rgba(80,50,12,0.12);
       }
 
+      html[data-renzu-auth-theme="light"] .rz-auth-gate .rz-auth-primary {
+        background: linear-gradient(180deg, #3a2109, #241305);
+        color: #fff4d6;
+        border-color: rgba(58,33,9,0.45);
+        box-shadow: 0 8px 22px rgba(58,33,9,0.18), inset 0 1px 0 rgba(255,255,255,0.10);
+      }
+
+      html[data-renzu-auth-theme="light"] .rz-auth-gate .rz-auth-primary:hover {
+        background: linear-gradient(180deg, #4a2b0d, #2a1706);
+        box-shadow: 0 10px 28px rgba(58,33,9,0.24), 0 0 18px rgba(216,163,77,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+      }
+
+      html[data-renzu-auth-theme="light"] .rz-auth-gate .rz-auth-secondary {
+        background: rgba(255,255,255,0.42);
+        color: rgba(43,23,6,0.72);
+        border-color: rgba(80,50,12,0.18);
+      }
+
+      html[data-renzu-auth-theme="light"] .rz-auth-gate .rz-auth-secondary:hover {
+        background: rgba(255,246,222,0.76);
+        color: #2b1706;
+      }
+
       html[data-renzu-auth-theme="scroll"] .rz-auth-gate-backdrop {
         background:
           radial-gradient(circle at 50% 18%, rgba(120,72,12,0.18), transparent 34%),
@@ -711,6 +732,23 @@
         color: rgba(42,21,2,0.68);
         background: rgba(255,240,200,0.24);
         border-color: rgba(80,45,8,0.16);
+      }
+
+      html[data-renzu-auth-theme="scroll"] .rz-auth-gate .rz-auth-primary {
+        background: linear-gradient(180deg, #6b4310, #3f2407);
+        color: #fff3cf;
+        border-color: rgba(80,45,8,0.45);
+        box-shadow: 0 8px 22px rgba(58,27,4,0.20), inset 0 1px 0 rgba(255,235,180,0.18);
+      }
+
+      html[data-renzu-auth-theme="scroll"] .rz-auth-gate .rz-auth-primary:hover {
+        background: linear-gradient(180deg, #7b5018, #4a2b0b);
+      }
+
+      html[data-renzu-auth-theme="scroll"] .rz-auth-gate .rz-auth-secondary {
+        background: rgba(255,238,196,0.22);
+        color: rgba(42,21,2,0.70);
+        border-color: rgba(80,45,8,0.20);
       }
 
       @media (max-width: 640px) {
@@ -779,11 +817,12 @@
         }
 
         .rz-auth-gate-watermark {
-          right: -160px;
-          top: -30px;
+          right: -230px;
+          bottom: -210px;
+          top: auto;
           width: 520px;
           height: 520px;
-          opacity: 0.075;
+          opacity: 0.055;
         }
 
         .rz-auth-gate-sigil {
