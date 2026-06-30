@@ -4068,25 +4068,6 @@ function getOrBuildSentences() {
       <InkBlobs show={!D && !S} />
       <ParchmentOverlay scroll={S} />
 
-      {!selected && themeOpen && (
-        <div
-          onClick={() => setThemeOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 24,
-            background: D
-              ? "rgba(0,0,0,0.46)"
-              : S
-                ? "rgba(80,42,8,0.20)"
-                : "rgba(236,232,222,0.58)",
-            backdropFilter: "blur(5px)",
-            WebkitBackdropFilter: "blur(5px)",
-            transition: "opacity 0.18s ease",
-          }}
-        />
-      )}
-
       {/* ── HEADER ── */}
       <div ref={topRef} style={{ position: "sticky", top: 8, zIndex: 30, padding: "0 12px" }}>
         <div style={{
@@ -4194,7 +4175,12 @@ function getOrBuildSentences() {
                   )}
                 </div>
                 {/* Filter toggle button */}
-                <button onClick={() => setThemeOpen(o => !o)} title="Filter by theme"
+                <button onClick={() => {
+                    if (!themeOpen) {
+                      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                    setThemeOpen(o => !o);
+                  }} title="Filter by theme"
                   style={{
                     flexShrink: 0, width: 36, height: 36, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
                     background: theme !== "all" ? tagActiveBg : inputBg,
